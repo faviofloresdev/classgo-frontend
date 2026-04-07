@@ -3,57 +3,33 @@
 import { useState } from "react"
 import { LandingPage } from "@/components/class-go/landing-page"
 import { LoginScreen } from "@/components/class-go/login-screen"
-import { TeacherDashboard } from "@/components/class-go/teacher-dashboard"
-import { CreateClassroom } from "@/components/class-go/create-classroom"
-import { CreateTopic } from "@/components/class-go/create-topic"
-import { StudentJoinClassroom } from "@/components/class-go/student-join-classroom"
-import { ChallengeHome } from "@/components/class-go/challenge-home"
+import { TeacherDashboardNew } from "@/components/class-go/teacher/teacher-dashboard-new"
+import { StudentDashboard } from "@/components/class-go/student/student-dashboard"
 import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
+import type { User } from "@/lib/types"
+import { getUserById, users } from "@/lib/store"
 
-export type Screen = 
-  | "landing" 
-  | "login" 
-  | "teacher-dashboard" 
-  | "create-classroom" 
-  | "create-topic"
-  | "student-join"
-  | "student-home" 
-  | "gameplay" 
+export type Screen =
+  | "landing"
+  | "login"
+  | "teacher-dashboard"
+  | "student-dashboard"
+  | "gameplay"
   | "results"
-
-export type UserRole = "teacher" | "student" | null
 
 export interface GameState {
   currentQuestion: number
   totalQuestions: number
   correctAnswers: number
   answers: { question: string; correct: boolean; selected: string }[]
-}
-
-export interface Classroom {
-  id: string
-  name: string
-  code: string
-  students: number
-}
-
-export interface Topic {
-  id: string
-  title: string
-  description: string
-  questions: { question: string; options: string[]; correct: number }[]
-  status: "active" | "completed" | "draft"
-  completedBy: number
-  totalStudents: number
-  averageScore: number
+  classroomId?: string
+  topicId?: string
 }
 
 export default function ClassGoApp() {
   const [screen, setScreen] = useState<Screen>("landing")
-  const [userRole, setUserRole] = useState<UserRole>(null)
-  const [currentClassroom, setCurrentClassroom] = useState<Classroom | null>(null)
-  const [studentClassrooms, setStudentClassrooms] = useState<{ id: string; name: string; code: string; currentTopic?: string }[]>([])
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [gameState, setGameState] = useState<GameState>({
     currentQuestion: 0,
     totalQuestions: 10,
@@ -65,67 +41,35 @@ export default function ClassGoApp() {
     setScreen("login")
   }
 
-  const handleLogin = (role: UserRole) => {
-    setUserRole(role)
-    if (role === "teacher") {
-      setScreen("teacher-dashboard")
-    } else {
-      setScreen("student-join")
+  const handleLogin = (role: "teacher" | "student") => {
+    // Mock login - in production, this would be real authentication
+    const mockUser = role === "teacher" 
+      ? users.find(u => u.role === "teacher") 
+      : users.find(u => u.role === "student")
+    
+    if (mockUser) {
+      setCurrentUser(mockUser)
+      setScreen(role === "teacher" ? "teacher-dashboard" : "student-dashboard")
     }
-  }
-
-  const handleJoinClassroom = (code: string) => {
-    // Simulate joining a classroom
-    const newClassroom = {
-      id: Date.now().toString(),
-      name: "Math Stars",
-      code: code,
-      currentTopic: "Multiplications by 2 and 3"
-    }
-    setStudentClassrooms(prev => [...prev, newClassroom])
-    setScreen("student-home")
-  }
-
-  const handleSelectStudentClassroom = (classroomId: string) => {
-    // Could set current classroom context here if needed
-    setScreen("student-home")
-  }
-
-  const handleEditTopic = (topicId: string) => {
-    // Navigate to create-topic with edit mode
-    // For now, just go to create topic screen
-    setScreen("create-topic")
   }
 
   const handleLogout = () => {
-    setUserRole(null)
-    setCurrentClassroom(null)
+    setCurrentUser(null)
     setScreen("landing")
   }
 
-  const handleCreateClassroom = () => {
-    setScreen("create-classroom")
+  const handleUserUpdate = (updatedUser: User) => {
+    setCurrentUser(updatedUser)
   }
 
-  const handleClassroomCreated = (classroom: Classroom) => {
-    setCurrentClassroom(classroom)
-    setScreen("teacher-dashboard")
-  }
-
-  const handleCreateTopic = () => {
-    setScreen("create-topic")
-  }
-
-  const handleTopicCreated = () => {
-    setScreen("teacher-dashboard")
-  }
-
-  const handleStartGame = () => {
+  const handleStartChallenge = (classroomId: string, topicId: string) => {
     setGameState({
       currentQuestion: 0,
       totalQuestions: 10,
       correctAnswers: 0,
       answers: [],
+      classroomId,
+      topicId,
     })
     setScreen("gameplay")
   }
@@ -136,59 +80,50 @@ export default function ClassGoApp() {
   }
 
   const handleBackToHome = () => {
-    if (userRole === "teacher") {
+    if (currentUser?.role === "teacher") {
       setScreen("teacher-dashboard")
     } else {
-      setScreen("student-home")
+      setScreen("student-dashboard")
     }
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
+    <main className="min-h-screen">
       {screen === "landing" && (
         <LandingPage onGetStarted={handleGetStarted} />
       )}
+      
       {screen === "login" && (
-        <LoginScreen onLogin={handleLogin} onBack={() => setScreen("landing")} />
+        <LoginScreen 
+          onLogin={handleLogin} 
+          onBack={() => setScreen("landing")} 
+        />
       )}
-      {screen === "teacher-dashboard" && (
-        <TeacherDashboard 
-          onCreateClassroom={handleCreateClassroom}
-          onCreateTopic={handleCreateTopic}
-          onEditTopic={handleEditTopic}
+      
+      {screen === "teacher-dashboard" && currentUser && (
+        <TeacherDashboardNew
+          user={currentUser}
           onLogout={handleLogout}
-          classroom={currentClassroom}
+          onUserUpdate={handleUserUpdate}
         />
       )}
-      {screen === "create-classroom" && (
-        <CreateClassroom 
-          onClassroomCreated={handleClassroomCreated}
-          onBack={() => setScreen("teacher-dashboard")}
-        />
-      )}
-      {screen === "create-topic" && (
-        <CreateTopic 
-          onTopicCreated={handleTopicCreated}
-          onBack={() => setScreen("teacher-dashboard")}
-        />
-      )}
-      {screen === "student-join" && (
-        <StudentJoinClassroom 
-          onJoinClassroom={handleJoinClassroom}
+      
+      {screen === "student-dashboard" && currentUser && (
+        <StudentDashboard
+          user={currentUser}
           onLogout={handleLogout}
-          joinedClassrooms={studentClassrooms}
-          onSelectClassroom={handleSelectStudentClassroom}
+          onUserUpdate={handleUserUpdate}
+          onStartChallenge={handleStartChallenge}
         />
       )}
-      {screen === "student-home" && (
-        <ChallengeHome onStartGame={handleStartGame} onLogout={handleLogout} />
-      )}
+      
       {screen === "gameplay" && (
         <GameplayScreen
           gameState={gameState}
           onGameComplete={handleGameComplete}
         />
       )}
+      
       {screen === "results" && (
         <ResultsScreen
           gameState={gameState}

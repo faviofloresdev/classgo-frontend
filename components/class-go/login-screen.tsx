@@ -9,21 +9,21 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, BookOpen, GraduationCap, Zap } from "lucide-react"
 import Link from "next/link"
 
-type UserRole = "teacher" | "student" | null
-
 interface LoginScreenProps {
-  onLogin: (role: UserRole) => void
+  onLogin: (role: "teacher" | "student") => void
   onBack: () => void
 }
 
 export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
-  const [selectedRole, setSelectedRole] = useState<UserRole>(null)
+  const [selectedRole, setSelectedRole] = useState<"teacher" | "student" | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin(selectedRole)
+    if (selectedRole) {
+      onLogin(selectedRole)
+    }
   }
 
   return (
