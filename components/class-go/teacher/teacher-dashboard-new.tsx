@@ -137,6 +137,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
 
   // Plan handlers
   const handleCreatePlan = () => {
+    console.log("[v0] handleCreatePlan called")
     setEditingPlan(null)
     setShowPlanForm(true)
   }
@@ -202,6 +203,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
 
   // Topic handlers
   const handleCreateTopic = () => {
+    console.log("[v0] handleCreateTopic called")
     setEditingTopic(null)
     setShowTopicForm(true)
   }
@@ -415,6 +417,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
       </main>
 
       {/* Modals */}
+      {console.log("[v0] Modal states:", { showPlanForm, showTopicForm, showClassroomForm, showAvatarSelector })}
       <AnimatePresence>
         {showClassroomForm && (
           <ClassroomForm

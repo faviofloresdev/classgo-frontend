@@ -37,7 +37,10 @@ export function TopicManager({
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={onCreateTopic}
+          onClick={() => {
+            console.log("[v0] Nuevo Topico button clicked")
+            onCreateTopic()
+          }}
           className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
         >
           <Plus className="h-5 w-5" />
