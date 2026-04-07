@@ -21,6 +21,8 @@ interface ClassroomManagerProps {
   classrooms: ClassroomWithDetails[]
   plans: Plan[]
   onCreateClassroom: () => void
+  onManagePlans: () => void
+  onManageTopics: () => void
   onEditClassroom: (classroom: ClassroomWithDetails) => void
   onDeleteClassroom: (classroomId: string) => void
   onViewClassroom: (classroom: ClassroomWithDetails) => void
@@ -31,6 +33,8 @@ export function ClassroomManager({
   classrooms,
   plans,
   onCreateClassroom,
+  onManagePlans,
+  onManageTopics,
   onEditClassroom,
   onDeleteClassroom,
   onViewClassroom,
@@ -54,15 +58,35 @@ export function ClassroomManager({
           <h2 className="text-2xl font-bold text-foreground">Mis Aulas</h2>
           <p className="text-muted-foreground">Gestiona tus aulas y estudiantes</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onCreateClassroom}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-5 w-5" />
-          Nueva Aula
-        </motion.button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onManagePlans}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <BookOpen className="h-5 w-5" />
+            Gestionar Planes
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onManageTopics}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <BookOpen className="h-5 w-5" />
+            Gestionar Topicos
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onCreateClassroom}
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-5 w-5" />
+            Nueva Aula
+          </motion.button>
+        </div>
       </div>
 
       {/* Classrooms Grid */}
@@ -250,9 +274,21 @@ export function ClassroomManager({
 
               <div className="space-y-2">
                 {plans.length === 0 ? (
-                  <p className="py-4 text-center text-muted-foreground">
-                    No tienes planes creados. Crea uno primero.
-                  </p>
+                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-5 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No tienes planes creados todavia. Crea uno primero para asignarlo a esta aula.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowAssignPlan(null)
+                        onCreatePlan()
+                      }}
+                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Crear Plan
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <button

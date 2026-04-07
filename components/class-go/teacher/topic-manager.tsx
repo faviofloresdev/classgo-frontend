@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, MoreVertical, Edit3, Trash2, Zap, BookOpen } from "lucide-react"
+import { Plus, MoreVertical, Edit3, Trash2, Zap, BookOpen, ArrowLeft } from "lucide-react"
 import type { Topic } from "@/lib/types"
 
 interface TopicManagerProps {
   topics: Topic[]
+  onBack: () => void
   onCreateTopic: () => void
   onEditTopic: (topic: Topic) => void
   onDeleteTopic: (topicId: string) => void
@@ -20,6 +21,7 @@ const difficultyLabels = {
 
 export function TopicManager({
   topics,
+  onBack,
   onCreateTopic,
   onEditTopic,
   onDeleteTopic,
@@ -30,9 +32,17 @@ export function TopicManager({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Mis Topicos</h2>
-          <p className="text-muted-foreground">Crea topicos para tus planes</p>
+        <div className="flex items-start gap-3">
+          <button
+            onClick={onBack}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Mis Topicos</h2>
+            <p className="text-muted-foreground">Crea topicos para tus planes</p>
+          </div>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -135,11 +145,14 @@ export function TopicManager({
               <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{topic.description}</p>
 
               {/* Difficulty Badge */}
-              <div className="mt-4">
+              <div className="mt-4 flex items-center gap-2">
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-medium ${difficultyLabels[topic.difficulty].color}`}
                 >
                   {difficultyLabels[topic.difficulty].label}
+                </span>
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {topic.questions.length} preguntas
                 </span>
               </div>
             </motion.div>

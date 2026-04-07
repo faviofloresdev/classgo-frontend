@@ -130,7 +130,8 @@ export function StudentClassroomView({
           <div className="p-6">
             {activeTopic ? (
               myCurrentWeekResult ? (
-                <div className="flex flex-col items-center justify-center py-4">
+                <div className="py-4">
+                  <div className="mb-6 flex flex-col items-center justify-center">
                   <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
                     <Trophy className="h-10 w-10 text-green-600" />
                   </div>
@@ -150,6 +151,16 @@ export function StudentClassroomView({
                       <div className="text-sm text-gray-500">Tiempo</div>
                     </div>
                   </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => onStartChallenge(classroom.id, activeTopic.id)}
+                    className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-pink-500 py-4 font-bold text-white shadow-lg transition-shadow hover:shadow-xl"
+                  >
+                    <Play className="h-6 w-6" fill="currentColor" />
+                    Probar Nuevamente
+                  </motion.button>
                 </div>
               ) : (
                 <motion.button
@@ -170,6 +181,58 @@ export function StudentClassroomView({
             )}
           </div>
         </motion.div>
+
+        {classroom.students && classroom.students.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-6 overflow-hidden rounded-3xl bg-white shadow-lg"
+          >
+            <div className="border-b border-gray-100 p-5">
+              <h3 className="flex items-center gap-2 text-lg font-black text-indigo-900">
+                <Users className="h-6 w-6 text-indigo-500" />
+                Ninos en Clase
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {classroom.students.length} companeros aprendiendo contigo
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-4 p-4">
+              {classroom.students.map((student, index) => {
+                const isMe = student.id === user.id
+
+                return (
+                  <motion.div
+                    key={student.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.08 + index * 0.03 }}
+                    className={`flex w-[120px] shrink-0 flex-col items-center rounded-2xl p-3 text-center sm:w-[132px] ${
+                      isMe ? "bg-gradient-to-b from-indigo-100 to-pink-100 ring-2 ring-indigo-400" : "bg-gray-50"
+                    }`}
+                  >
+                    <img
+                      src={getAvatarUrl(student.avatarId)}
+                      alt={student.name}
+                      className="mb-3 h-16 w-16 rounded-full border-4 border-white bg-white shadow-md"
+                      crossOrigin="anonymous"
+                    />
+                    <p className="line-clamp-2 text-sm font-bold text-gray-900">
+                      {student.name.split(" ").slice(0, 2).join(" ")}
+                    </p>
+                    {isMe && (
+                      <span className="mt-2 rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-bold text-white">
+                        Tu
+                      </span>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
 
         {/* Leaderboard */}
         <motion.div

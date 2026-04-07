@@ -1,19 +1,15 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import {
-  LayoutDashboard,
   Users,
   BookOpen,
   Lightbulb,
   LogOut,
-  Menu,
-  X,
   Settings,
 } from "lucide-react"
 import type { User, ClassroomWithDetails, PlanWithTopics, Topic, Classroom, Plan } from "@/lib/types"
-import { getAvatarUrl } from "@/lib/avatars"
 import { AvatarSelector } from "../avatar-selector"
 import { ClassroomManager } from "./classroom-manager"
 import { ClassroomForm } from "./classroom-form"
@@ -56,7 +52,6 @@ interface TeacherDashboardNewProps {
 export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDashboardNewProps) {
   // State
   const [activeTab, setActiveTab] = useState<TabId>("classrooms")
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showAvatarSelector, setShowAvatarSelector] = useState(false)
 
   // Data state (in real app, use SWR)
@@ -128,9 +123,14 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
     if (!viewingClassroom) return
     const newWeek = viewingClassroom.currentWeek + 1
     updateClassroom(viewingClassroom.id, { currentWeek: newWeek })
-    if (viewingClassroom.activePlanId) {
-      activateWeekTopic(viewingClassroom.activePlanId, newWeek)
-    }
+    refreshData()
+    setViewingClassroom(getTeacherClassrooms(user.id).find((c) => c.id === viewingClassroom.id) || null)
+  }
+
+  const handlePreviousWeek = () => {
+    if (!viewingClassroom || viewingClassroom.currentWeek <= 1) return
+    const previousWeek = viewingClassroom.currentWeek - 1
+    updateClassroom(viewingClassroom.id, { currentWeek: previousWeek })
     refreshData()
     setViewingClassroom(getTeacherClassrooms(user.id).find((c) => c.id === viewingClassroom.id) || null)
   }
@@ -219,6 +219,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
     icon: string
     color: string
     difficulty: "easy" | "medium" | "hard"
+    questions: Topic["questions"]
   }) => {
     if (editingTopic) {
       updateTopic(editingTopic.id, data)
@@ -255,165 +256,123 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
   ]
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-foreground/50 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ x: sidebarOpen ? 0 : "-100%" }}
-        className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-border bg-card lg:relative lg:translate-x-0"
-      >
-        {/* Logo/Header */}
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">
-              CG
-            </div>
-            <span className="text-lg font-bold text-foreground">ClassGo</span>
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto max-w-7xl p-4 lg:p-8">
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm text-muted-foreground">Panel del profesor</p>
+            <h1 className="truncate text-2xl font-bold text-foreground">{user.name}</h1>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="rounded-lg p-2 text-muted-foreground lg:hidden"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
-        {/* User Profile */}
-        <div className="border-b border-border p-4">
+        {!viewingClassroom && !showTopicForm && (
+          <div className="mb-4 rounded-3xl border border-border bg-card p-4 shadow-sm lg:p-5">
+            <div className="flex flex-wrap gap-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setViewingClassroom(null)
+                    setShowTopicForm(false)
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold transition-colors ${
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <tab.icon className="h-5 w-5" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-6 flex justify-end gap-2">
           <button
             onClick={() => setShowAvatarSelector(true)}
-            className="flex w-full items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted"
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 font-semibold text-foreground transition-colors hover:bg-muted"
           >
-            <img
-              src={getAvatarUrl(user.avatarId)}
-              alt={user.name}
-              className="h-12 w-12 rounded-full bg-muted"
-              crossOrigin="anonymous"
-            />
-            <div className="flex-1 text-left">
-              <p className="font-semibold text-foreground">{user.name}</p>
-              <p className="text-sm text-muted-foreground">Profesor</p>
-            </div>
-            <Settings className="h-5 w-5 text-muted-foreground" />
+            <Settings className="h-4 w-4" />
+            Perfil
           </button>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  setViewingClassroom(null)
-                  setSidebarOpen(false)
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <tab.icon className="h-5 w-5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* Logout */}
-        <div className="border-t border-border p-4">
           <button
             onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-destructive transition-colors hover:bg-destructive/10"
+            className="inline-flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-2 font-semibold text-destructive transition-colors hover:bg-destructive/15"
           >
-            <LogOut className="h-5 w-5" />
-            Cerrar Sesion
+            <LogOut className="h-4 w-4" />
+            Salir
           </button>
         </div>
-      </motion.aside>
 
-      {/* Main Content */}
-      <main className="flex-1">
-        {/* Mobile Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card p-4 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-muted-foreground"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <span className="text-lg font-bold text-foreground">ClassGo</span>
-          <img
-            src={getAvatarUrl(user.avatarId)}
-            alt={user.name}
-            className="h-10 w-10 rounded-full bg-muted"
-            crossOrigin="anonymous"
+        {showTopicForm ? (
+          <TopicForm
+            topic={editingTopic}
+            onSave={handleSaveTopic}
+            onClose={() => {
+              setShowTopicForm(false)
+              setEditingTopic(null)
+            }}
           />
-        </header>
+        ) : viewingClassroom ? (
+          <ClassroomDetail
+            classroom={viewingClassroom}
+            results={getClassroomResults(viewingClassroom.id)}
+            onBack={() => setViewingClassroom(null)}
+            onPreviousWeek={handlePreviousWeek}
+            onAdvanceWeek={handleAdvanceWeek}
+          />
+        ) : (
+          <>
+            {activeTab === "classrooms" && (
+              <ClassroomManager
+                classrooms={classrooms}
+                plans={allPlans.filter((p) => p.teacherId === user.id)}
+                onCreateClassroom={handleCreateClassroom}
+                onManagePlans={() => {
+                  setViewingClassroom(null)
+                  setActiveTab("plans")
+                }}
+                onManageTopics={() => {
+                  setViewingClassroom(null)
+                  setActiveTab("topics")
+                }}
+                onEditClassroom={handleEditClassroom}
+                onDeleteClassroom={handleDeleteClassroom}
+                onViewClassroom={setViewingClassroom}
+                onAssignPlan={handleAssignPlan}
+              />
+            )}
 
-        {/* Content */}
-        <div className="p-4 lg:p-8">
-          {viewingClassroom ? (
-            <ClassroomDetail
-              classroom={viewingClassroom}
-              results={getClassroomResults(viewingClassroom.id)}
-              onBack={() => setViewingClassroom(null)}
-              onAdvanceWeek={handleAdvanceWeek}
-            />
-          ) : (
-            <>
-              {activeTab === "classrooms" && (
-                <ClassroomManager
-                  classrooms={classrooms}
-                  plans={allPlans.filter((p) => p.teacherId === user.id)}
-                  onCreateClassroom={handleCreateClassroom}
-                  onEditClassroom={handleEditClassroom}
-                  onDeleteClassroom={handleDeleteClassroom}
-                  onViewClassroom={setViewingClassroom}
-                  onAssignPlan={handleAssignPlan}
-                />
-              )}
+            {activeTab === "plans" && (
+              <PlanManager
+                plans={plans}
+                topics={topics}
+                onBack={() => setActiveTab("classrooms")}
+                onCreatePlan={handleCreatePlan}
+                onCreateTopic={handleCreateTopic}
+                onEditPlan={handleEditPlan}
+                onDeletePlan={handleDeletePlan}
+                onAddTopicToPlan={handleAddTopicToPlan}
+                onRemoveTopicFromPlan={handleRemoveTopicFromPlan}
+                onReorderTopics={handleReorderTopics}
+                onActivateWeek={handleActivateWeek}
+              />
+            )}
 
-              {activeTab === "plans" && (
-                <PlanManager
-                  plans={plans}
-                  topics={topics}
-                  onCreatePlan={handleCreatePlan}
-                  onEditPlan={handleEditPlan}
-                  onDeletePlan={handleDeletePlan}
-                  onAddTopicToPlan={handleAddTopicToPlan}
-                  onRemoveTopicFromPlan={handleRemoveTopicFromPlan}
-                  onReorderTopics={handleReorderTopics}
-                  onActivateWeek={handleActivateWeek}
-                />
-              )}
-
-              {activeTab === "topics" && (
-                <TopicManager
-                  topics={topics}
-                  onCreateTopic={handleCreateTopic}
-                  onEditTopic={handleEditTopic}
-                  onDeleteTopic={handleDeleteTopic}
-                />
-              )}
-            </>
-          )}
-        </div>
+            {activeTab === "topics" && (
+              <TopicManager
+                topics={topics}
+                onBack={() => setActiveTab("classrooms")}
+                onCreateTopic={handleCreateTopic}
+                onEditTopic={handleEditTopic}
+                onDeleteTopic={handleDeleteTopic}
+              />
+            )}
+          </>
+        )}
       </main>
 
       {/* Modals */}
@@ -440,18 +399,6 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
             }}
           />
         )}
-
-        {showTopicForm && (
-          <TopicForm
-            topic={editingTopic}
-            onSave={handleSaveTopic}
-            onClose={() => {
-              setShowTopicForm(false)
-              setEditingTopic(null)
-            }}
-          />
-        )}
-
         {showAvatarSelector && (
           <AvatarSelector
             currentAvatarId={user.avatarId}

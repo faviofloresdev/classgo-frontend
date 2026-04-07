@@ -69,6 +69,19 @@ export const topics: Topic[] = [
     icon: 'Calculator',
     color: '#10B981',
     difficulty: 'easy',
+    questions: [
+      {
+        id: 'topic-1-q1',
+        type: 'single_choice',
+        prompt: 'Cuanto es 3 + 4?',
+        explanation: 'Sumamos 3 y 4 para obtener 7.',
+        options: [
+          { id: 'a', text: '6', isCorrect: false },
+          { id: 'b', text: '7', isCorrect: true },
+          { id: 'c', text: '8', isCorrect: false },
+        ],
+      },
+    ],
     teacherId: 'teacher-1',
     createdAt: new Date('2024-01-01'),
   },
@@ -79,6 +92,15 @@ export const topics: Topic[] = [
     icon: 'Minus',
     color: '#3B82F6',
     difficulty: 'easy',
+    questions: [
+      {
+        id: 'topic-2-q1',
+        type: 'fill_in_blank',
+        prompt: 'Completa la palabra escondiendo letras.',
+        word: 'CUATRO',
+        hiddenIndexes: [1, 3],
+      },
+    ],
     teacherId: 'teacher-1',
     createdAt: new Date('2024-01-02'),
   },
@@ -89,6 +111,19 @@ export const topics: Topic[] = [
     icon: 'X',
     color: '#8B5CF6',
     difficulty: 'medium',
+    questions: [
+      {
+        id: 'topic-3-q1',
+        type: 'multiple_choice',
+        prompt: 'Selecciona todas las multiplicaciones que dan 12.',
+        options: [
+          { id: 'a', text: '3 x 4', isCorrect: true },
+          { id: 'b', text: '2 x 6', isCorrect: true },
+          { id: 'c', text: '5 x 2', isCorrect: false },
+          { id: 'd', text: '4 x 4', isCorrect: false },
+        ],
+      },
+    ],
     teacherId: 'teacher-1',
     createdAt: new Date('2024-01-03'),
   },
@@ -99,6 +134,19 @@ export const topics: Topic[] = [
     icon: 'Divide',
     color: '#F59E0B',
     difficulty: 'medium',
+    questions: [
+      {
+        id: 'topic-4-q1',
+        type: 'listen_and_select',
+        prompt: 'Escucha y selecciona la respuesta correcta.',
+        audioText: 'Seis dividido entre dos',
+        options: [
+          { id: 'a', text: '2', isCorrect: false },
+          { id: 'b', text: '3', isCorrect: true },
+          { id: 'c', text: '4', isCorrect: false },
+        ],
+      },
+    ],
     teacherId: 'teacher-1',
     createdAt: new Date('2024-01-04'),
   },
@@ -109,6 +157,19 @@ export const topics: Topic[] = [
     icon: 'PieChart',
     color: '#EF4444',
     difficulty: 'hard',
+    questions: [
+      {
+        id: 'topic-5-q1',
+        type: 'match_items',
+        prompt: 'Relaciona cada enunciado con una palabra.',
+        instruction: 'Une cada enunciado corto con la palabra correcta.',
+        pairs: [
+          { id: 'a', left: 'Tiene cuatro lados iguales', right: 'Cuadrado' },
+          { id: 'b', left: 'Color del cielo', right: 'Azul' },
+          { id: 'c', left: 'Animal que ladra', right: 'Perro' },
+        ],
+      },
+    ],
     teacherId: 'teacher-1',
     createdAt: new Date('2024-01-05'),
   },
@@ -244,6 +305,10 @@ export function getTeacherPlans(teacherId: string): PlanWithTopics[] {
 
 export function getTeacherTopics(teacherId: string): Topic[] {
   return topics.filter(t => t.teacherId === teacherId)
+}
+
+export function getTopicById(topicId: string): Topic | undefined {
+  return topics.find(t => t.id === topicId)
 }
 
 export function getClassroomResults(classroomId: string, weekNumber?: number): StudentResultWithDetails[] {
@@ -421,6 +486,13 @@ export function updateUserAvatar(userId: string, avatarId: string): User | undef
   const index = users.findIndex(u => u.id === userId)
   if (index === -1) return undefined
   users[index].avatarId = avatarId
+  return users[index]
+}
+
+export function updateUserProfile(userId: string, data: Partial<Pick<User, 'name' | 'avatarId'>>): User | undefined {
+  const index = users.findIndex(u => u.id === userId)
+  if (index === -1) return undefined
+  users[index] = { ...users[index], ...data }
   return users[index]
 }
 

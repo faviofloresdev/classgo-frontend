@@ -24,7 +24,7 @@ import {
   getStudentClassrooms,
   getStudentResults,
   getLeaderboard,
-  updateUserAvatar,
+  updateUserProfile,
   getActiveTopicForClassroom,
 } from "@/lib/store"
 
@@ -41,8 +41,8 @@ export function StudentDashboard({
   onUserUpdate,
   onStartChallenge,
 }: StudentDashboardProps) {
-  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>([])
-  const [results, setResults] = useState<StudentResultWithDetails[]>([])
+  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>(() => getStudentClassrooms(user.id))
+  const [results, setResults] = useState<StudentResultWithDetails[]>(() => getStudentResults(user.id))
   const [showAvatarSelector, setShowAvatarSelector] = useState(false)
   const [selectedClassroom, setSelectedClassroom] = useState<ClassroomWithDetails | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
@@ -52,14 +52,30 @@ export function StudentDashboard({
     setResults(getStudentResults(user.id))
   }, [user.id])
 
+  useEffect(() => {
+    const refreshedClassrooms = getStudentClassrooms(user.id)
+    const refreshedResults = getStudentResults(user.id)
+
+    setClassrooms(refreshedClassrooms)
+    setResults(refreshedResults)
+
+    if (selectedClassroom) {
+      const updatedSelectedClassroom = refreshedClassrooms.find(c => c.id === selectedClassroom.id) || null
+      setSelectedClassroom(updatedSelectedClassroom)
+    }
+  }, [user.id, selectedClassroom?.id])
+
   // Calculate total stats
   const totalScore = results.reduce((sum, r) => sum + r.score, 0)
   const completedChallenges = results.length
   const avgScore = completedChallenges > 0 ? Math.round(totalScore / completedChallenges) : 0
   const currentStreak = Math.min(completedChallenges, 5) // Mock streak
 
-  const handleAvatarChange = (avatarId: string) => {
-    const updated = updateUserAvatar(user.id, avatarId)
+  const handleAvatarChange = (avatarId: string, name?: string) => {
+    const updated = updateUserProfile(user.id, {
+      avatarId,
+      name: name?.trim() ? name.trim() : user.name,
+    })
     if (updated) {
       onUserUpdate(updated)
       setShowConfetti(true)
@@ -390,6 +406,8 @@ export function StudentDashboard({
         {showAvatarSelector && (
           <AvatarSelector
             currentAvatarId={user.avatarId}
+            currentName={user.name}
+            showNameField
             onSelect={handleAvatarChange}
             onClose={() => setShowAvatarSelector(false)}
           />

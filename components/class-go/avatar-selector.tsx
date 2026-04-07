@@ -4,21 +4,32 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Check } from "lucide-react"
 import { avatars, avatarCategories, type Avatar } from "@/lib/avatars"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface AvatarSelectorProps {
   currentAvatarId: string
-  onSelect: (avatarId: string) => void
+  currentName?: string
+  showNameField?: boolean
+  onSelect: (avatarId: string, name?: string) => void
   onClose: () => void
 }
 
-export function AvatarSelector({ currentAvatarId, onSelect, onClose }: AvatarSelectorProps) {
+export function AvatarSelector({
+  currentAvatarId,
+  currentName = "",
+  showNameField = false,
+  onSelect,
+  onClose,
+}: AvatarSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<Avatar["category"]>("animals")
   const [selectedId, setSelectedId] = useState(currentAvatarId)
+  const [name, setName] = useState(currentName)
 
   const filteredAvatars = avatars.filter((a) => a.category === selectedCategory)
 
   const handleConfirm = () => {
-    onSelect(selectedId)
+    onSelect(selectedId, name.trim())
     onClose()
   }
 
@@ -47,6 +58,19 @@ export function AvatarSelector({ currentAvatarId, onSelect, onClose }: AvatarSel
               <X className="h-5 w-5" />
             </button>
           </div>
+
+          {showNameField && (
+            <div className="mb-4 space-y-2">
+              <Label htmlFor="student-profile-name">Tu nombre</Label>
+              <Input
+                id="student-profile-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Escribe tu nombre"
+                className="h-12"
+              />
+            </div>
+          )}
 
           {/* Category Tabs */}
           <div className="mb-4 flex flex-wrap gap-2">
@@ -108,6 +132,7 @@ export function AvatarSelector({ currentAvatarId, onSelect, onClose }: AvatarSel
             </button>
             <button
               onClick={handleConfirm}
+              disabled={showNameField && !name.trim()}
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Confirmar

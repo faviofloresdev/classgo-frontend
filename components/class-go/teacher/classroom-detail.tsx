@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ interface ClassroomDetailProps {
   classroom: ClassroomWithDetails
   results: StudentResultWithDetails[]
   onBack: () => void
+  onPreviousWeek: () => void
   onAdvanceWeek: () => void
 }
 
@@ -28,10 +29,15 @@ export function ClassroomDetail({
   classroom,
   results,
   onBack,
+  onPreviousWeek,
   onAdvanceWeek,
 }: ClassroomDetailProps) {
   const [showHistory, setShowHistory] = useState(false)
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
+  const [selectedWeek, setSelectedWeek] = useState<number>(classroom.currentWeek || 1)
+
+  useEffect(() => {
+    setSelectedWeek(classroom.currentWeek || 1)
+  }, [classroom.currentWeek])
 
   // Group results by week
   const resultsByWeek = results.reduce(
@@ -43,14 +49,17 @@ export function ClassroomDetail({
     {} as Record<number, StudentResultWithDetails[]>
   )
 
-  const currentWeekResults = resultsByWeek[classroom.currentWeek] || []
+  const displayedWeek = selectedWeek || classroom.currentWeek || 1
+  const currentWeekResults = resultsByWeek[displayedWeek] || []
   const pastWeeks = Object.keys(resultsByWeek)
     .map(Number)
     .filter((w) => w < classroom.currentWeek)
     .sort((a, b) => b - a)
 
-  // Get active topic for current week
+  // The active topic badge follows the plan's single active week.
   const activeTopic = classroom.plan?.topics.find((t) => t.isActive)
+  const activeColor = activeTopic?.topic.color || "#7C3AED"
+  const activeColorSoft = `${activeColor}22`
 
   // Calculate stats
   const completedStudents = currentWeekResults.filter((r) => r.score > 0).length
@@ -83,14 +92,19 @@ export function ClassroomDetail({
         animate={{ opacity: 1, y: 0 }}
         className="overflow-hidden rounded-2xl border border-border bg-card"
       >
-        <div className="bg-gradient-to-r from-primary to-primary/80 p-6 text-primary-foreground">
+        <div
+          className="p-6 text-white"
+          style={{
+            background: `linear-gradient(90deg, ${activeColor} 0%, ${activeColor}CC 100%)`,
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-primary-foreground/80">Semana Actual</p>
-              <h2 className="text-3xl font-bold">{classroom.currentWeek || "Sin iniciar"}</h2>
+              <p className="mb-2 text-sm font-medium text-white/80">Semana Actual</p>
+              <h2 className="text-3xl font-bold">{displayedWeek || "Sin iniciar"}</h2>
             </div>
             {activeTopic && (
-              <div className="rounded-xl bg-primary-foreground/20 px-4 py-2">
+              <div className="rounded-xl px-4 py-2" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
                 <div className="flex items-center gap-2">
                   <Zap className="h-5 w-5" />
                   <span className="font-semibold">{activeTopic.topic.name}</span>
@@ -137,14 +151,26 @@ export function ClassroomDetail({
 
         {classroom.plan && classroom.currentWeek > 0 && (
           <div className="border-t border-border p-4">
-            <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              onClick={onAdvanceWeek}
-              className="w-full rounded-xl bg-primary py-3 font-semibold text-primary-foreground"
-            >
-              Avanzar a Semana {classroom.currentWeek + 1}
-            </motion.button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={onPreviousWeek}
+                disabled={classroom.currentWeek <= 1}
+                className="w-full rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Retroceder a Semana {Math.max(classroom.currentWeek - 1, 1)}
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={onAdvanceWeek}
+                className="w-full rounded-xl py-3 font-semibold text-white"
+                style={{ backgroundColor: activeColor }}
+              >
+                Avanzar a Semana {classroom.currentWeek + 1}
+              </motion.button>
+            </div>
           </div>
         )}
       </motion.div>
@@ -152,7 +178,7 @@ export function ClassroomDetail({
       {/* Students List */}
       <div className="rounded-2xl border border-border bg-card p-6">
         <h3 className="mb-4 text-lg font-bold text-foreground">
-          Estudiantes - Semana {classroom.currentWeek || 1}
+          Estudiantes - Semana {displayedWeek}
         </h3>
 
         {classroom.students && classroom.students.length > 0 ? (
@@ -251,8 +277,9 @@ export function ClassroomDetail({
                       return (
                         <button
                           key={week}
-                          onClick={() => setSelectedWeek(selectedWeek === week ? null : week)}
+                          onClick={() => setSelectedWeek(week)}
                           className="flex w-full items-center justify-between rounded-xl border border-border bg-background p-4 text-left transition-colors hover:bg-muted"
+                          style={selectedWeek === week ? { borderColor: activeColor, backgroundColor: activeColorSoft } : undefined}
                         >
                           <div>
                             <p className="font-semibold text-foreground">Semana {week}</p>

@@ -109,9 +109,14 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
               <h1 className="truncate text-lg font-bold text-foreground sm:text-xl lg:text-2xl">Challenge Results</h1>
             </div>
           </div>
-          <Button onClick={onBackToHome} size="sm" className="h-10 shrink-0 rounded-xl px-4 sm:h-11 sm:px-5">
+          <Button
+            onClick={onBackToHome}
+            size="sm"
+            variant="outline"
+            className="h-11 shrink-0 rounded-xl border-border bg-background/95 px-4 font-semibold text-foreground shadow-sm hover:bg-muted sm:px-5"
+          >
             <ArrowLeft className="mr-2 size-4" />
-            Back
+            Volver
           </Button>
         </header>
 
@@ -277,7 +282,7 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
         <div className="lg:hidden">
           <Button onClick={onBackToHome} size="lg" className="h-12 w-full rounded-xl font-semibold">
             <ArrowLeft className="mr-2 size-5" />
-            Back to Classroom
+            Volver al Aula
           </Button>
         </div>
       </div>

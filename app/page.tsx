@@ -8,7 +8,7 @@ import { StudentDashboard } from "@/components/class-go/student/student-dashboar
 import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
 import type { User } from "@/lib/types"
-import { getUserById, users } from "@/lib/store"
+import { getTopicById, getUserById, users } from "@/lib/store"
 
 export type Screen =
   | "landing"
@@ -63,9 +63,10 @@ export default function ClassGoApp() {
   }
 
   const handleStartChallenge = (classroomId: string, topicId: string) => {
+    const topic = getTopicById(topicId)
     setGameState({
       currentQuestion: 0,
-      totalQuestions: 10,
+      totalQuestions: topic?.questions.length || 1,
       correctAnswers: 0,
       answers: [],
       classroomId,

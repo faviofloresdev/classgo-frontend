@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence, Reorder } from "framer-motion"
 import {
+  ArrowLeft,
   Plus,
   MoreVertical,
   Edit3,
@@ -21,7 +22,9 @@ import type { PlanWithTopics, Topic } from "@/lib/types"
 interface PlanManagerProps {
   plans: PlanWithTopics[]
   topics: Topic[]
+  onBack: () => void
   onCreatePlan: () => void
+  onCreateTopic: () => void
   onEditPlan: (plan: PlanWithTopics) => void
   onDeletePlan: (planId: string) => void
   onAddTopicToPlan: (planId: string, topicId: string) => void
@@ -33,7 +36,9 @@ interface PlanManagerProps {
 export function PlanManager({
   plans,
   topics,
+  onBack,
   onCreatePlan,
+  onCreateTopic,
   onEditPlan,
   onDeletePlan,
   onAddTopicToPlan,
@@ -56,22 +61,41 @@ export function PlanManager({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Mis Planes</h2>
-          <p className="text-muted-foreground">Organiza topicos por semana</p>
+        <div className="flex items-start gap-3">
+          <button
+            onClick={onBack}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Mis Planes</h2>
+            <p className="text-muted-foreground">Organiza topicos por semana</p>
+          </div>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => {
-            console.log("[v0] Nuevo Plan button clicked")
-            onCreatePlan()
-          }}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-5 w-5" />
-          Nuevo Plan
-        </motion.button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onCreateTopic}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <Zap className="h-5 w-5" />
+            Crear Topico
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              console.log("[v0] Nuevo Plan button clicked")
+              onCreatePlan()
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-5 w-5" />
+            Nuevo Plan
+          </motion.button>
+        </div>
       </div>
 
       {/* Plans List */}
@@ -304,9 +328,21 @@ export function PlanManager({
 
               <div className="space-y-2">
                 {getAvailableTopics(showAddTopic).length === 0 ? (
-                  <p className="py-4 text-center text-muted-foreground">
-                    No hay topicos disponibles. Crea nuevos topicos primero.
-                  </p>
+                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-5 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No hay topicos disponibles. Crea nuevos topicos y luego agregalos al plan.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowAddTopic(null)
+                        onCreateTopic()
+                      }}
+                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Crear Topico
+                    </button>
+                  </div>
                 ) : (
                   getAvailableTopics(showAddTopic).map((topic) => (
                     <button
