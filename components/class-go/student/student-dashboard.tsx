@@ -21,7 +21,18 @@ import type { ClassroomWithDetails, StudentResultWithDetails, Topic, User } from
 import { getAvatarUrl } from "@/lib/avatars"
 import { AvatarSelector } from "../avatar-selector"
 import { StudentClassroomView } from "./student-classroom-view"
-import { getClassroomLeaderboard, getGameplayContext, getStudentClassrooms, getStudentResults, joinClassroom, subscribeToGameplayStream, updateProfile } from "@/lib/api"
+import {
+  connectGameplayPresence,
+  disconnectGameplayPresence,
+  getClassroomLeaderboard,
+  getGameplayContext,
+  getStudentClassrooms,
+  getStudentResults,
+  heartbeatGameplayPresence,
+  joinClassroom,
+  subscribeToGameplayStream,
+  updateProfile,
+} from "@/lib/api"
 
 interface StudentDashboardProps {
   user: User
@@ -110,23 +121,39 @@ export function StudentDashboard({
 
     let isActive = true
     const classroomId = selectedClassroom.id
+    let hasPresenceConnection = false
+    let heartbeatId: ReturnType<typeof setInterval> | null = null
     const unsubscribe = subscribeToGameplayStream(classroomId, {
-      onSubscribed: () => {
-        if (!isActive) {
+      onSubscribed: async () => {
+        if (!isActive || hasPresenceConnection) {
           return
         }
 
-        setConnectedStudentsByClassroom((currentState) => {
-          const existingStudentIds = currentState[classroomId] || []
-          if (existingStudentIds.includes(user.id)) {
-            return currentState
+        try {
+          await connectGameplayPresence(classroomId)
+          if (!isActive) {
+            return
           }
 
-          return {
-            ...currentState,
-            [classroomId]: [...existingStudentIds, user.id],
-          }
-        })
+          hasPresenceConnection = true
+          setConnectedStudentsByClassroom((currentState) => {
+            const existingStudentIds = currentState[classroomId] || []
+            if (existingStudentIds.includes(user.id)) {
+              return currentState
+            }
+
+            return {
+              ...currentState,
+              [classroomId]: [...existingStudentIds, user.id],
+            }
+          })
+
+          heartbeatId = setInterval(() => {
+            void heartbeatGameplayPresence(classroomId).catch(() => undefined)
+          }, 20000)
+        } catch {
+          // Presence falls back to backend timeout if connect fails after subscribe.
+        }
       },
       onStudentConnected: (event) => {
         if (!isActive || event.studentId === user.id) {
@@ -194,12 +221,23 @@ export function StudentDashboard({
 
     return () => {
       isActive = false
-      unsubscribe()
+      if (heartbeatId) {
+        clearInterval(heartbeatId)
+      }
       setConnectedStudentsByClassroom((currentState) => {
         const nextState = { ...currentState }
         delete nextState[classroomId]
         return nextState
       })
+
+      if (hasPresenceConnection) {
+        void disconnectGameplayPresence(classroomId, { keepalive: true })
+          .catch(() => undefined)
+          .finally(unsubscribe)
+        return
+      }
+
+      unsubscribe()
     }
   }, [selectedClassroom, user.id])
 
@@ -251,10 +289,6 @@ export function StudentDashboard({
   const openClassroom = async (classroom: ClassroomWithDetails) => {
     await getGameplayContext(classroom.id).catch(() => undefined)
     setSelectedClassroom(classroom)
-    setConnectedStudentsByClassroom((currentState) => ({
-      ...currentState,
-      [classroom.id]: [user.id],
-    }))
     const leaderboard = await getClassroomLeaderboard(classroom.id, classroom.currentWeek).catch(() => [])
     setSelectedLeaderboard(leaderboard)
   }

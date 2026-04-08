@@ -793,6 +793,28 @@ export async function getGameplayContext(classroomId: string) {
   }
 }
 
+export async function connectGameplayPresence(classroomId: string) {
+  await apiRequest<void>(`/api/gameplay/presence/connect?classroomId=${encodeURIComponent(classroomId)}`, {
+    method: "POST",
+  })
+}
+
+export async function heartbeatGameplayPresence(classroomId: string) {
+  await apiRequest<void>(`/api/gameplay/presence/heartbeat?classroomId=${encodeURIComponent(classroomId)}`, {
+    method: "POST",
+  })
+}
+
+export async function disconnectGameplayPresence(
+  classroomId: string,
+  options: { keepalive?: boolean } = {}
+) {
+  await apiRequest<void>(`/api/gameplay/presence/disconnect?classroomId=${encodeURIComponent(classroomId)}`, {
+    method: "POST",
+    keepalive: options.keepalive,
+  })
+}
+
 export function subscribeToGameplayStream(
   classroomId: string,
   options: {
