@@ -27,11 +27,26 @@ interface StudentClassroomViewProps {
   leaderboard: LeaderboardEntry[]
   connectedStudentIds: string[]
   onBack: () => void
-  onStartChallenge: (classroomId: string) => Promise<void>
+  onStartChallenge: (classroomId: string, options?: { retryCount?: number; forceRetry?: boolean }) => Promise<void>
 }
 
 function getActiveTopic(classroom: ClassroomWithDetails): Topic | undefined {
   return classroom.plan?.topics.find((topic) => topic.isActive)?.topic
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds}s`
+  }
+
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+
+  if (remainingSeconds === 0) {
+    return `${minutes}m`
+  }
+
+  return `${minutes}m ${remainingSeconds}s`
 }
 
 export function StudentClassroomView({
@@ -133,11 +148,24 @@ export function StudentClassroomView({
                       <div className="h-12 w-px bg-gray-200" />
                       <div className="text-center">
                         <div className="text-3xl font-black text-indigo-600">
-                          {Math.round(myCurrentWeekResult.timeSpent / 60)}m
+                          {formatDuration(myCurrentWeekResult.timeSpent)}
                         </div>
-                        <div className="text-sm text-gray-500">Tiempo</div>
+                        <div className="text-sm text-gray-500">Time</div>
                       </div>
                     </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        void onStartChallenge(classroom.id, { retryCount: 1, forceRetry: true })
+                      }}
+                      className="flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-amber-500 to-pink-500 px-6 py-4 font-bold text-white shadow-lg transition-shadow hover:shadow-xl"
+                    >
+                      <Play className="h-6 w-6" fill="currentColor" />
+                      Try again
+                    </motion.button>
                   </div>
                 </div>
               ) : (

@@ -150,14 +150,18 @@ export default function ClassGoApp() {
     setCurrentUser(updatedUser)
   }
 
-  const handleStartChallenge = async (classroomId: string, retryCount = 0) => {
+  const handleStartChallenge = async (
+    classroomId: string,
+    options: { retryCount?: number; forceRetry?: boolean } = {}
+  ) => {
+    const retryCount = options.retryCount || 0
     const context = await getGameplayContext(classroomId)
 
     if (!context.topic) {
       throw new Error("This classroom does not have an active challenge.")
     }
 
-    if (!context.attemptAllowed && context.existingResult) {
+    if (!options.forceRetry && !context.attemptAllowed && context.existingResult) {
       setGameState({
         currentQuestion: context.existingResult.totalQuestions || 0,
         totalQuestions: context.existingResult.totalQuestions || 0,
@@ -196,7 +200,10 @@ export default function ClassGoApp() {
 
   const handleRetryChallenge = async () => {
     if (!gameState.classroomId) return
-    await handleStartChallenge(gameState.classroomId, (gameState.retryCount || 0) + 1)
+    await handleStartChallenge(gameState.classroomId, {
+      retryCount: (gameState.retryCount || 0) + 1,
+      forceRetry: true,
+    })
   }
 
   const handleGameComplete = async (finalState: GameState) => {

@@ -185,6 +185,19 @@ export interface GameplayStreamSubscribedEvent {
   status: string
 }
 
+export interface PresenceSnapshotStudent {
+  studentId: string
+  studentName: string
+  avatarId?: string | null
+  lastSeenAt: string
+}
+
+export interface PresenceSnapshotEvent {
+  classroomId: string
+  students: PresenceSnapshotStudent[]
+  happenedAt: string
+}
+
 export interface SessionData {
   accessToken: string
   refreshToken?: string
@@ -819,6 +832,7 @@ export function subscribeToGameplayStream(
   classroomId: string,
   options: {
     onSubscribed?: (event: GameplayStreamSubscribedEvent) => void
+    onPresenceSnapshot?: (event: PresenceSnapshotEvent) => void
     onStudentConnected: (event: StudentPresenceStreamEvent) => void
     onStudentDisconnected?: (event: StudentPresenceStreamEvent) => void
     onError?: (error: Error) => void
@@ -853,6 +867,14 @@ export function subscribeToGameplayStream(
     source.addEventListener("subscribed", (event) => {
       try {
         options.onSubscribed?.(JSON.parse((event as MessageEvent<string>).data) as GameplayStreamSubscribedEvent)
+      } catch {
+        // Ignore malformed SSE payloads.
+      }
+    })
+
+    source.addEventListener("presence-snapshot", (event) => {
+      try {
+        options.onPresenceSnapshot?.(JSON.parse((event as MessageEvent<string>).data) as PresenceSnapshotEvent)
       } catch {
         // Ignore malformed SSE payloads.
       }

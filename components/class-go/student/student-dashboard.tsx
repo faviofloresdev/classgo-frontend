@@ -38,7 +38,7 @@ interface StudentDashboardProps {
   user: User
   onLogout: () => void
   onUserUpdate: (user: User) => void
-  onStartChallenge: (classroomId: string) => Promise<void>
+  onStartChallenge: (classroomId: string, options?: { retryCount?: number; forceRetry?: boolean }) => Promise<void>
 }
 
 interface PresenceNotification {
@@ -53,6 +53,21 @@ type ConnectedStudentsByClassroom = Record<string, string[]>
 
 function getActiveTopic(classroom: ClassroomWithDetails): Topic | undefined {
   return classroom.plan?.topics.find((topic) => topic.isActive)?.topic
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds}s`
+  }
+
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+
+  if (remainingSeconds === 0) {
+    return `${minutes}m`
+  }
+
+  return `${minutes}m ${remainingSeconds}s`
 }
 
 export function StudentDashboard({
@@ -123,37 +138,62 @@ export function StudentDashboard({
     const classroomId = selectedClassroom.id
     let hasPresenceConnection = false
     let heartbeatId: ReturnType<typeof setInterval> | null = null
-    const unsubscribe = subscribeToGameplayStream(classroomId, {
-      onSubscribed: async () => {
-        if (!isActive || hasPresenceConnection) {
+    let connectFallbackId: ReturnType<typeof setTimeout> | null = null
+
+    const startPresenceConnection = async () => {
+      if (!isActive || hasPresenceConnection) {
+        return
+      }
+
+      try {
+        await connectGameplayPresence(classroomId)
+        if (!isActive) {
           return
         }
 
-        try {
-          await connectGameplayPresence(classroomId)
-          if (!isActive) {
-            return
+        hasPresenceConnection = true
+        setConnectedStudentsByClassroom((currentState) => {
+          const existingStudentIds = currentState[classroomId] || []
+          const mergedStudentIds = Array.from(new Set([...existingStudentIds, user.id]))
+
+          return {
+            ...currentState,
+            [classroomId]: mergedStudentIds,
           }
+        })
 
-          hasPresenceConnection = true
-          setConnectedStudentsByClassroom((currentState) => {
-            const existingStudentIds = currentState[classroomId] || []
-            if (existingStudentIds.includes(user.id)) {
-              return currentState
-            }
+        heartbeatId = setInterval(() => {
+          void heartbeatGameplayPresence(classroomId).catch(() => undefined)
+        }, 20000)
+      } catch {
+        // Presence falls back to backend timeout if connect fails.
+      }
+    }
 
-            return {
-              ...currentState,
-              [classroomId]: [...existingStudentIds, user.id],
-            }
-          })
-
-          heartbeatId = setInterval(() => {
-            void heartbeatGameplayPresence(classroomId).catch(() => undefined)
-          }, 20000)
-        } catch {
-          // Presence falls back to backend timeout if connect fails after subscribe.
+    const unsubscribe = subscribeToGameplayStream(classroomId, {
+      onSubscribed: () => {
+        if (connectFallbackId) {
+          clearTimeout(connectFallbackId)
+          connectFallbackId = null
         }
+
+        void startPresenceConnection()
+      },
+      onPresenceSnapshot: (event) => {
+        if (!isActive) {
+          return
+        }
+
+        setConnectedStudentsByClassroom((currentState) => {
+          const existingStudentIds = currentState[event.classroomId] || []
+          const snapshotStudentIds = event.students.map((student) => student.studentId)
+          const mergedStudentIds = Array.from(new Set([...existingStudentIds, ...snapshotStudentIds]))
+
+          return {
+            ...currentState,
+            [event.classroomId]: mergedStudentIds,
+          }
+        })
       },
       onStudentConnected: (event) => {
         if (!isActive || event.studentId === user.id) {
@@ -219,10 +259,17 @@ export function StudentDashboard({
       },
     })
 
+    connectFallbackId = setTimeout(() => {
+      void startPresenceConnection()
+    }, 1500)
+
     return () => {
       isActive = false
       if (heartbeatId) {
         clearInterval(heartbeatId)
+      }
+      if (connectFallbackId) {
+        clearTimeout(connectFallbackId)
       }
       setConnectedStudentsByClassroom((currentState) => {
         const nextState = { ...currentState }
@@ -642,7 +689,7 @@ export function StudentDashboard({
                     <p className="font-bold text-gray-900">{result.topic?.name || "Challenge"}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Clock className="h-3 w-3" />
-                      {Math.round(result.timeSpent / 60)}m
+                      {formatDuration(result.timeSpent)}
                     </div>
                   </div>
                   <div
