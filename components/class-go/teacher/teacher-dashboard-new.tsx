@@ -249,7 +249,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
               <button
                 onClick={() => setShowAvatarSelector(true)}
                 className="shrink-0 rounded-full transition-transform hover:scale-105"
-                aria-label="Cambiar avatar"
+                aria-label="Change avatar"
               >
                 <Avatar className="size-14 border-2 border-white bg-card shadow-md">
                   <AvatarImage src={getAvatarUrl(user.avatarId)} alt={user.name} crossOrigin="anonymous" />

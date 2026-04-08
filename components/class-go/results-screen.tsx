@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Medal, Sparkles, Star, Target, TrendingUp, Trophy, Zap } from "lucide-react"
 import type { GameState } from "@/app/page"
 import type { User } from "@/lib/types"
+import { getAvatarUrl } from "@/lib/avatars"
 import confetti from "canvas-confetti"
 
 interface ResultsScreenProps {
@@ -66,7 +67,10 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
     const applause = new Audio("/audio/clapping.mp3")
     applause.volume = 0.6
     applauseAudioRef.current = applause
-    void applause.play().catch(() => undefined)
+
+    const playTimeout = window.setTimeout(() => {
+      void applause.play().catch(() => undefined)
+    }, 180)
 
     const duration = 3000
     const animationEnd = Date.now() + duration
@@ -97,6 +101,7 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
     }, 250)
 
     return () => {
+      window.clearTimeout(playTimeout)
       clearInterval(interval)
       applause.pause()
       applause.currentTime = 0
@@ -283,6 +288,11 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
                         {player.rank}
                       </div>
                       <Avatar className="size-10 shrink-0 bg-gradient-to-br from-primary to-accent">
+                        <AvatarImage
+                          src={getAvatarUrl(player.student.studentAvatarId || player.student.avatarId)}
+                          alt={player.student.name}
+                          crossOrigin="anonymous"
+                        />
                         <AvatarFallback className="text-xs font-semibold text-white">
                           {player.student.name.slice(0, 1).toUpperCase()}
                         </AvatarFallback>

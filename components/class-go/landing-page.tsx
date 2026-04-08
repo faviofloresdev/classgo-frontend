@@ -55,35 +55,35 @@ const teacherCards = [
 const floatingAvatars = [
   {
     id: "parent-1",
-    alt: "Avatar de familia",
+    alt: "Family avatar",
     className: "left-2 top-20 sm:left-4 lg:left-8",
     size: "h-14 w-14 md:h-16 md:w-16",
     delay: 0,
   },
   {
     id: "animal-3",
-    alt: "Avatar de estudiante",
+    alt: "Student avatar",
     className: "right-3 top-24 sm:right-5 lg:right-10",
     size: "h-13 w-13 md:h-15 md:w-15",
     delay: 0.5,
   },
   {
     id: "char-2",
-    alt: "Avatar de estudiante",
+    alt: "Student avatar",
     className: "right-2 top-[28rem] sm:right-8 lg:top-80",
     size: "h-12 w-12 md:h-14 md:w-14",
     delay: 1,
   },
   {
     id: "animal-6",
-    alt: "Avatar de estudiante",
+    alt: "Student avatar",
     className: "left-4 top-[22rem] sm:left-8 lg:left-14",
     size: "h-13 w-13 md:h-15 md:w-15",
     delay: 1.4,
   },
   {
     id: "robot-5",
-    alt: "Avatar de estudiante",
+    alt: "Student avatar",
     className: "right-6 top-[11rem] md:right-12 lg:right-20",
     size: "h-12 w-12 md:h-14 md:w-14",
     delay: 1.8,
@@ -93,18 +93,45 @@ const floatingAvatars = [
 export function LandingPage({ onGetStarted }: LandingPageProps) {
   const introAudioRef = useRef<HTMLAudioElement | null>(null)
   const howItWorksRef = useRef<HTMLElement | null>(null)
+  const hasUnlockedAudioRef = useRef(false)
 
   useEffect(() => {
     const audio = new Audio("/audio/intro.mp3")
+    audio.preload = "auto"
     audio.volume = 0.35
     audio.loop = true
     introAudioRef.current = audio
 
-    void audio.play().catch(() => {
-      // Some browsers require user interaction before playback.
-    })
+    const tryPlayAudio = () => {
+      if (!introAudioRef.current) {
+        return
+      }
+
+      void introAudioRef.current.play().then(() => {
+        hasUnlockedAudioRef.current = true
+      }).catch(() => {
+        // Some browsers require user interaction before playback.
+      })
+    }
+
+    const unlockAudio = () => {
+      if (hasUnlockedAudioRef.current) {
+        return
+      }
+
+      tryPlayAudio()
+    }
+
+    tryPlayAudio()
+
+    window.addEventListener("pointerdown", unlockAudio)
+    window.addEventListener("keydown", unlockAudio)
+    document.addEventListener("visibilitychange", tryPlayAudio)
 
     return () => {
+      window.removeEventListener("pointerdown", unlockAudio)
+      window.removeEventListener("keydown", unlockAudio)
+      document.removeEventListener("visibilitychange", tryPlayAudio)
       audio.pause()
       audio.currentTime = 0
     }
@@ -197,7 +224,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                 </div>
 
                 <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <span className="text-yellow-500">✦</span>
+                  <span className="text-yellow-500">*</span>
                   Designed to learn, compete, and grow as a family
                 </div>
               </div>
@@ -207,19 +234,19 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                   <div className="mb-6 flex items-center justify-center gap-2">
                     <img
                       src={getAvatarUrl("parent-1")}
-                      alt="Avatar familiar"
+                      alt="Family avatar"
                       className="h-14 w-14 rounded-full border-4 border-white shadow-md md:h-16 md:w-16"
                       crossOrigin="anonymous"
                     />
                     <img
                       src={getAvatarUrl("animal-2")}
-                      alt="Avatar estudiante"
+                      alt="Student avatar"
                       className="h-16 w-16 rounded-full border-4 border-white shadow-md md:h-20 md:w-20"
                       crossOrigin="anonymous"
                     />
                     <img
                       src={getAvatarUrl("animal-5")}
-                      alt="Avatar estudiante"
+                      alt="Student avatar"
                       className="h-14 w-14 rounded-full border-4 border-white shadow-md md:h-16 md:w-16"
                       crossOrigin="anonymous"
                     />
@@ -349,7 +376,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <footer className="border-t border-primary/6 px-6 py-8">
             <div className="mx-auto max-w-md text-center">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
-                <span>✦</span>
+                <span>*</span>
                 Class Go
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
@@ -363,3 +390,4 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
     </div>
   )
 }
+
