@@ -301,7 +301,7 @@ export function StudentClassroomView({
                             </motion.div>
                           )}
                           <img
-                            src={getAvatarUrl(entry.student.avatarId)}
+                            src={getAvatarUrl(entry.student.studentAvatarId || entry.student.avatarId)}
                             alt={entry.student.name}
                             className={`mb-2 ${isFirst ? "h-20 w-20 border-4 border-yellow-400" : isSecond ? "h-16 w-16 border-3 border-gray-300" : "h-14 w-14 border-3 border-amber-500"} rounded-full bg-white shadow-lg`}
                             crossOrigin="anonymous"
@@ -351,7 +351,7 @@ export function StudentClassroomView({
                         )}
                       </div>
                       <img
-                        src={getAvatarUrl(entry.student.avatarId)}
+                        src={getAvatarUrl(entry.student.studentAvatarId || entry.student.avatarId)}
                         alt={entry.student.name}
                         className="h-10 w-10 rounded-full border-2 border-white bg-white shadow"
                         crossOrigin="anonymous"
