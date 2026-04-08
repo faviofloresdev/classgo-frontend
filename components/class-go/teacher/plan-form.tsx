@@ -31,9 +31,9 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
     e.preventDefault()
     const newErrors: Record<string, string> = {}
 
-    if (!name.trim()) newErrors.name = "El nombre es requerido"
+    if (!name.trim()) newErrors.name = "Name is required"
     if (activationMode === "auto" && !startDate) {
-      newErrors.startDate = "La fecha de inicio es requerida para modo automatico"
+      newErrors.startDate = "Start date is required for automatic mode"
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -66,7 +66,7 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
       >
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-foreground">
-            {plan ? "Editar Plan" : "Nuevo Plan"}
+            {plan ? "Edit Plan" : "New Plan"}
           </h2>
           <button
             onClick={onClose}
@@ -80,13 +80,13 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
           {/* Name */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Nombre del Plan
+              Plan Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Matematicas Nivel 1"
+              placeholder="Ex: Math Level 1"
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
@@ -95,12 +95,12 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
           {/* Description */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Descripcion
+              Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe tu plan..."
+              placeholder="Describe your plan..."
               rows={3}
               className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
@@ -109,7 +109,7 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
           {/* Activation Mode */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Modo de Activacion
+              Activation Mode
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -134,13 +134,13 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
                 }`}
               >
                 <Calendar className="h-5 w-5" />
-                <span className="font-medium">Automatico</span>
+                <span className="font-medium">Automatic</span>
               </button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               {activationMode === "manual"
-                ? "Activa los topicos manualmente cuando estes listo"
-                : "Los topicos se activaran automaticamente cada semana"}
+                ? "Activate topics manually whenever you are ready"
+                : "Topics will activate automatically each week"}
             </p>
           </div>
 
@@ -148,7 +148,7 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
           {activationMode === "auto" && (
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Fecha de Inicio
+                Start Date
               </label>
               <input
                 type="date"
@@ -169,13 +169,13 @@ export function PlanForm({ plan, onSave, onClose }: PlanFormProps) {
               onClick={onClose}
               className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              {plan ? "Guardar" : "Crear Plan"}
+              {plan ? "Save" : "Create Plan"}
             </button>
           </div>
         </form>

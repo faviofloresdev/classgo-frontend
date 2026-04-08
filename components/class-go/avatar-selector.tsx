@@ -50,7 +50,7 @@ export function AvatarSelector({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">Selecciona tu Avatar</h2>
+            <h2 className="text-xl font-bold text-foreground">Choose Your Avatar</h2>
             <button
               onClick={onClose}
               className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted"
@@ -61,12 +61,12 @@ export function AvatarSelector({
 
           {showNameField && (
             <div className="mb-4 space-y-2">
-              <Label htmlFor="student-profile-name">Tu nombre</Label>
+              <Label htmlFor="student-profile-name">Your name</Label>
               <Input
                 id="student-profile-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Escribe tu nombre"
+                placeholder="Enter your name"
                 className="h-12"
               />
             </div>
@@ -128,14 +128,14 @@ export function AvatarSelector({
               onClick={onClose}
               className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               onClick={handleConfirm}
               disabled={showNameField && !name.trim()}
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Confirmar
+              Confirm
             </button>
           </div>
         </motion.div>

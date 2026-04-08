@@ -3,7 +3,15 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { ArrowLeft, Plus, Trash2 } from "lucide-react"
-import type { Topic, TopicChoiceOption, TopicMatchPair, TopicQuestion, TopicQuestionType } from "@/lib/types"
+import type {
+  FillInBlankQuestion,
+  MatchItemsQuestion,
+  Topic,
+  TopicChoiceOption,
+  TopicMatchPair,
+  TopicQuestion,
+  TopicQuestionType,
+} from "@/lib/types"
 
 interface TopicFormProps {
   topic?: Topic | null
@@ -20,11 +28,11 @@ interface TopicFormProps {
 
 const colorOptions = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#84CC16"]
 const questionTypes: { value: TopicQuestionType; label: string }[] = [
-  { value: "multiple_choice", label: "Seleccion multiple" },
-  { value: "single_choice", label: "Seleccion unica" },
-  { value: "fill_in_blank", label: "Completar palabras" },
-  { value: "listen_and_select", label: "Escuchar y seleccion" },
-  { value: "match_items", label: "Relacionar items" },
+  { value: "multiple_choice", label: "Multiple choice" },
+  { value: "single_choice", label: "Single choice" },
+  { value: "fill_in_blank", label: "Fill in the blank" },
+  { value: "listen_and_select", label: "Listen and select" },
+  { value: "match_items", label: "Match items" },
 ]
 
 const createId = () => Math.random().toString(36).slice(2, 10)
@@ -50,6 +58,12 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
   const updateQuestion = (id: string, updater: (q: TopicQuestion) => TopicQuestion) =>
     setQuestions((current) => current.map((q) => (q.id === id ? updater(q) : q)))
 
+  const updateFillQuestion = (id: string, updater: (q: FillInBlankQuestion) => FillInBlankQuestion) =>
+    updateQuestion(id, (q) => (q.type === "fill_in_blank" ? updater(q) : q))
+
+  const updateMatchQuestion = (id: string, updater: (q: MatchItemsQuestion) => MatchItemsQuestion) =>
+    updateQuestion(id, (q) => (q.type === "match_items" ? updater(q) : q))
+
   const updateChoiceSet = (
     id: string,
     updater: (options: TopicChoiceOption[], type: "single_choice" | "multiple_choice" | "listen_and_select") => TopicChoiceOption[]
@@ -61,27 +75,27 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
 
   const validate = () => {
     const next: Record<string, string> = {}
-    if (!name.trim()) next.name = "El nombre es requerido"
-    if (!questions.length) next.questions = "Agrega al menos una pregunta"
+    if (!name.trim()) next.name = "Name is required"
+    if (!questions.length) next.questions = "Add at least one question"
 
     questions.forEach((q, index) => {
       const key = `question-${q.id}`
-      if (!q.prompt.trim()) next[key] = `La pregunta ${index + 1} necesita un enunciado`
+      if (!q.prompt.trim()) next[key] = `Question ${index + 1} needs a prompt`
       if (q.type === "fill_in_blank") {
-        if (!q.word.trim()) next[key] = `La pregunta ${index + 1} necesita una palabra`
-        if (!q.hiddenIndexes.length) next[key] = `La pregunta ${index + 1} debe ocultar al menos una letra`
+        if (!q.word.trim()) next[key] = `Question ${index + 1} needs a word`
+        if (!q.hiddenIndexes.length) next[key] = `Question ${index + 1} must hide at least one letter`
       }
       if (q.type === "match_items") {
-        if (!q.instruction.trim()) next[key] = `La pregunta ${index + 1} necesita una instruccion`
-        if (q.pairs.filter((p) => p.left.trim() && p.right.trim()).length < 2) next[key] = `La pregunta ${index + 1} necesita dos pares`
-        if (q.pairs.some((p) => p.right.trim().includes(" "))) next[key] = `La pregunta ${index + 1} debe relacionar cada enunciado con una sola palabra`
+        if (!q.instruction.trim()) next[key] = `Question ${index + 1} needs an instruction`
+        if (q.pairs.filter((p) => p.left.trim() && p.right.trim()).length < 2) next[key] = `Question ${index + 1} needs two pairs`
+        if (q.pairs.some((p) => p.right.trim().includes(" "))) next[key] = `Question ${index + 1} must match each prompt to a single word`
       }
       if (q.type === "single_choice" || q.type === "multiple_choice" || q.type === "listen_and_select") {
-        if (q.options.filter((o) => o.text.trim()).length < 2) next[key] = `La pregunta ${index + 1} necesita dos opciones`
-        if (q.type === "single_choice" && q.options.filter((o) => o.isCorrect).length !== 1) next[key] = `La pregunta ${index + 1} necesita una correcta`
-        if (q.type === "multiple_choice" && !q.options.some((o) => o.isCorrect)) next[key] = `La pregunta ${index + 1} necesita una correcta`
-        if (q.type === "listen_and_select" && q.options.filter((o) => o.isCorrect).length !== 1) next[key] = `La pregunta ${index + 1} necesita una sola respuesta correcta`
-        if (q.type === "listen_and_select" && !q.audioText.trim()) next[key] = `La pregunta ${index + 1} necesita texto de audio`
+        if (q.options.filter((o) => o.text.trim()).length < 2) next[key] = `Question ${index + 1} needs two options`
+        if (q.type === "single_choice" && q.options.filter((o) => o.isCorrect).length !== 1) next[key] = `Question ${index + 1} needs one correct answer`
+        if (q.type === "multiple_choice" && !q.options.some((o) => o.isCorrect)) next[key] = `Question ${index + 1} needs at least one correct answer`
+        if (q.type === "listen_and_select" && q.options.filter((o) => o.isCorrect).length !== 1) next[key] = `Question ${index + 1} needs exactly one correct answer`
+        if (q.type === "listen_and_select" && !q.audioText.trim()) next[key] = `Question ${index + 1} needs audio text`
       }
     })
 
@@ -102,8 +116,8 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h2 className="text-xl font-bold text-foreground">{topic ? "Editar Topico" : "Nuevo Topico"}</h2>
-          <p className="text-sm text-muted-foreground">Configura el topico en una pantalla completa.</p>
+          <h2 className="text-xl font-bold text-foreground">{topic ? "Edit Topic" : "New Topic"}</h2>
+          <p className="text-sm text-muted-foreground">Configure the topic on a full-screen layout.</p>
         </div>
       </div>
 
@@ -112,12 +126,12 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_320px]">
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">Nombre del Topico</label>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">Topic Name</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-xl border border-border bg-background px-4 py-3" />
                 {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">Descripcion</label>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">Description</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
               </div>
             </div>
@@ -131,7 +145,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">Dificultad</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">Difficulty</label>
                 <div className="grid gap-2">
                   {(["easy", "medium", "hard"] as const).map((value) => (
                     <button key={value} type="button" onClick={() => setDifficulty(value)} className={`rounded-xl border-2 p-3 text-left ${difficulty === value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
@@ -146,8 +160,8 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
           <section className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Preguntas</h3>
-                <p className="text-sm text-muted-foreground">Agrega preguntas y respuestas dentro del topico.</p>
+                <h3 className="text-lg font-semibold text-foreground">Questions</h3>
+                <p className="text-sm text-muted-foreground">Add questions and answers inside this topic.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {questionTypes.map((type) => (
@@ -165,7 +179,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                 <div key={q.id} className="rounded-2xl border border-border p-4">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Pregunta {index + 1}</p>
+                      <p className="text-sm font-semibold text-foreground">Question {index + 1}</p>
                       <p className="text-xs text-muted-foreground">{questionTypes.find((item) => item.value === q.type)?.label}</p>
                     </div>
                     <div className="flex gap-2">
@@ -180,32 +194,32 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-foreground">Enunciado</label>
+                      <label className="mb-1.5 block text-sm font-medium text-foreground">Prompt</label>
                       <input value={q.prompt} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, prompt: e.target.value }))} className="w-full rounded-xl border border-border bg-background px-4 py-3" />
                     </div>
 
                     {q.type === "fill_in_blank" && (
                       <>
                         <div>
-                          <label className="mb-1.5 block text-sm font-medium text-foreground">Palabra</label>
+                          <label className="mb-1.5 block text-sm font-medium text-foreground">Word</label>
                           <input
                             value={q.word}
                             onChange={(e) =>
-                              updateQuestion(q.id, (current) => {
+                              updateFillQuestion(q.id, (current) => {
                                 const nextWord = e.target.value.toUpperCase()
                                 return {
                                   ...current,
                                   word: nextWord,
-                                  hiddenIndexes: current.hiddenIndexes.filter((index) => index < nextWord.length),
+                                  hiddenIndexes: current.hiddenIndexes.filter((index: number) => index < nextWord.length),
                                 }
                               })
                             }
-                            placeholder="Ej: CASA"
+                            placeholder="Ex: HOUSE"
                             className="w-full rounded-xl border border-border bg-background px-4 py-3 uppercase"
                           />
                         </div>
                         <div>
-                          <label className="mb-1.5 block text-sm font-medium text-foreground">Letras a ocultar</label>
+                          <label className="mb-1.5 block text-sm font-medium text-foreground">Letters to hide</label>
                           {q.word.trim() ? (
                             <div className="flex flex-wrap gap-2">
                               {Array.from(q.word).map((letter, letterIndex) => {
@@ -215,10 +229,10 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                                     key={`${q.id}-letter-${letterIndex}`}
                                     type="button"
                                     onClick={() =>
-                                      updateQuestion(q.id, (current) => ({
+                                      updateFillQuestion(q.id, (current) => ({
                                         ...current,
                                         hiddenIndexes: current.hiddenIndexes.includes(letterIndex)
-                                          ? current.hiddenIndexes.filter((index) => index !== letterIndex)
+                                          ? current.hiddenIndexes.filter((index: number) => index !== letterIndex)
                                           : [...current.hiddenIndexes, letterIndex].sort((a, b) => a - b),
                                       }))
                                     }
@@ -234,12 +248,12 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                               })}
                             </div>
                           ) : (
-                            <p className="text-sm text-muted-foreground">Escribe la palabra y luego marca las letras que se van a esconder.</p>
+                            <p className="text-sm text-muted-foreground">Type the word and then mark the letters that should be hidden.</p>
                           )}
                         </div>
                         {q.word.trim() && (
                           <div className="rounded-xl bg-muted/40 p-3">
-                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Vista previa</p>
+                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Preview</p>
                             <p className="mt-2 text-lg font-bold tracking-[0.2em] text-foreground">
                               {Array.from(q.word)
                                 .map((letter, letterIndex) => (q.hiddenIndexes.includes(letterIndex) ? "_" : letter))
@@ -254,7 +268,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                       <>
                         {q.type === "listen_and_select" && (
                           <>
-                            <textarea value={q.audioText} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, audioText: e.target.value }))} rows={3} placeholder="Texto para escuchar" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
+                            <textarea value={q.audioText} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, audioText: e.target.value }))} rows={3} placeholder="Text to read aloud" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
                             <p className="text-sm text-muted-foreground">Selecciona una sola respuesta correcta para lo que el alumno escuchará.</p>
                           </>
                         )}
@@ -278,13 +292,13 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                                 }
                                 className={`rounded-full px-3 py-1 text-xs ${option.isCorrect ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                               >
-                                {option.isCorrect ? "Correcta" : "Marcar"}
+                                {option.isCorrect ? "Correct" : "Mark"}
                               </button>
                               <input value={option.text} onChange={(e) => updateChoiceSet(q.id, (options) => options.map((item) => item.id === option.id ? { ...item, text: e.target.value } : item))} className="w-full rounded-xl border border-border bg-background px-4 py-2.5" />
                               <button type="button" onClick={() => updateChoiceSet(q.id, (options) => options.length > 2 ? options.filter((item) => item.id !== option.id) : options)} className="rounded-xl border border-border px-3 py-2 text-muted-foreground"><Trash2 className="h-4 w-4" /></button>
                             </div>
                           ))}
-                          <button type="button" onClick={() => updateChoiceSet(q.id, (options) => [...options, choice()])} className="rounded-xl border border-border px-3 py-2 text-sm">Agregar opcion</button>
+                          <button type="button" onClick={() => updateChoiceSet(q.id, (options) => [...options, choice()])} className="rounded-xl border border-border px-3 py-2 text-sm">Add option</button>
                         </div>
                       </>
                     )}
@@ -292,26 +306,26 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                     {q.type === "match_items" && (
                       <>
                         <div>
-                          <label className="mb-1.5 block text-sm font-medium text-foreground">Instruccion</label>
-                          <input value={q.instruction} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, instruction: e.target.value }))} placeholder="Relaciona cada enunciado con la palabra correcta" className="w-full rounded-xl border border-border bg-background px-4 py-3" />
+                          <label className="mb-1.5 block text-sm font-medium text-foreground">Instruction</label>
+                          <input value={q.instruction} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, instruction: e.target.value }))} placeholder="Match each clue with the correct word" className="w-full rounded-xl border border-border bg-background px-4 py-3" />
                         </div>
                         <div className="rounded-xl bg-muted/40 p-3">
-                          <p className="text-sm text-muted-foreground">Usa enunciados pequenos a la izquierda y una sola palabra a la derecha.</p>
+                          <p className="text-sm text-muted-foreground">Use short clues on the left and a single word on the right.</p>
                         </div>
                         <div className="space-y-2">
                           {q.pairs.map((item) => (
                             <div key={item.id} className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[1fr_1fr_auto]">
-                              <input value={item.left} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.map((pairItem) => pairItem.id === item.id ? { ...pairItem, left: e.target.value } : pairItem) }))} placeholder="Enunciado corto" className="w-full rounded-xl border border-border bg-background px-4 py-2.5" />
-                              <input value={item.right} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.map((pairItem) => pairItem.id === item.id ? { ...pairItem, right: e.target.value } : pairItem) }))} placeholder="Palabra" className="w-full rounded-xl border border-border bg-background px-4 py-2.5" />
-                              <button type="button" onClick={() => updateQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.length > 2 ? current.pairs.filter((pairItem) => pairItem.id !== item.id) : current.pairs }))} className="rounded-xl border border-border px-3 py-2 text-muted-foreground"><Trash2 className="h-4 w-4" /></button>
+                              <input value={item.left} onChange={(e) => updateMatchQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.map((pairItem: TopicMatchPair) => pairItem.id === item.id ? { ...pairItem, left: e.target.value } : pairItem) }))} placeholder="Short clue" className="w-full rounded-xl border border-border bg-background px-4 py-2.5" />
+                              <input value={item.right} onChange={(e) => updateMatchQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.map((pairItem: TopicMatchPair) => pairItem.id === item.id ? { ...pairItem, right: e.target.value } : pairItem) }))} placeholder="Word" className="w-full rounded-xl border border-border bg-background px-4 py-2.5" />
+                              <button type="button" onClick={() => updateMatchQuestion(q.id, (current) => ({ ...current, pairs: current.pairs.length > 2 ? current.pairs.filter((pairItem: TopicMatchPair) => pairItem.id !== item.id) : current.pairs }))} className="rounded-xl border border-border px-3 py-2 text-muted-foreground"><Trash2 className="h-4 w-4" /></button>
                             </div>
                           ))}
-                          <button type="button" onClick={() => updateQuestion(q.id, (current) => ({ ...current, pairs: [...current.pairs, pair()] }))} className="rounded-xl border border-border px-3 py-2 text-sm">Agregar par</button>
+                          <button type="button" onClick={() => updateMatchQuestion(q.id, (current) => ({ ...current, pairs: [...current.pairs, pair()] }))} className="rounded-xl border border-border px-3 py-2 text-sm">Add pair</button>
                         </div>
                       </>
                     )}
 
-                    <textarea value={q.explanation || ""} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, explanation: e.target.value }))} rows={2} placeholder="Explicacion opcional" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
+                    <textarea value={q.explanation || ""} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, explanation: e.target.value }))} rows={2} placeholder="Optional explanation" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
                     {errors[`question-${q.id}`] && <p className="text-sm text-destructive">{errors[`question-${q.id}`]}</p>}
                   </div>
                 </div>
@@ -321,10 +335,10 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground hover:bg-muted">
-              Cancelar
+              Cancel
             </button>
             <button type="submit" className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground hover:bg-primary/90">
-              {topic ? "Guardar" : "Crear Topico"}
+              {topic ? "Save" : "Create Topic"}
             </button>
           </div>
         </form>

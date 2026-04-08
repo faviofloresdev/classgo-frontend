@@ -129,6 +129,9 @@ export interface StudentResult {
   score: number
   completedAt: Date
   timeSpent: number // seconds
+  correctAnswers?: number
+  totalQuestions?: number
+  answers?: unknown
 }
 
 export interface WeekHistory {
@@ -161,4 +164,10 @@ export interface StudentResultWithDetails extends StudentResult {
 export interface TopicWithWeek extends Topic {
   weekNumber: number
   isActive: boolean
+}
+
+export interface LeaderboardEntry {
+  student: User
+  totalScore: number
+  rank: number
 }

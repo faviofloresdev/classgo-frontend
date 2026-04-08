@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trophy,
@@ -15,24 +15,33 @@ import {
   Clock,
   Users,
   Sparkles,
+  Plus,
 } from "lucide-react"
-import type { User, ClassroomWithDetails, StudentResultWithDetails } from "@/lib/types"
+import type { ClassroomWithDetails, StudentResultWithDetails, Topic, User } from "@/lib/types"
 import { getAvatarUrl } from "@/lib/avatars"
 import { AvatarSelector } from "../avatar-selector"
 import { StudentClassroomView } from "./student-classroom-view"
-import {
-  getStudentClassrooms,
-  getStudentResults,
-  getLeaderboard,
-  updateUserProfile,
-  getActiveTopicForClassroom,
-} from "@/lib/store"
+import { getClassroomLeaderboard, getGameplayContext, getStudentClassrooms, getStudentResults, joinClassroom, subscribeToGameplayStream, updateProfile } from "@/lib/api"
 
 interface StudentDashboardProps {
   user: User
   onLogout: () => void
   onUserUpdate: (user: User) => void
-  onStartChallenge: (classroomId: string, topicId: string) => void
+  onStartChallenge: (classroomId: string) => Promise<void>
+}
+
+interface PresenceNotification {
+  id: string
+  classroomName: string
+  studentName: string
+  avatarId: string
+  message: string
+}
+
+type ConnectedStudentsByClassroom = Record<string, string[]>
+
+function getActiveTopic(classroom: ClassroomWithDetails): Topic | undefined {
+  return classroom.plan?.topics.find((topic) => topic.isActive)?.topic
 }
 
 export function StudentDashboard({
@@ -41,62 +50,269 @@ export function StudentDashboard({
   onUserUpdate,
   onStartChallenge,
 }: StudentDashboardProps) {
-  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>(() => getStudentClassrooms(user.id))
-  const [results, setResults] = useState<StudentResultWithDetails[]>(() => getStudentResults(user.id))
+  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>([])
+  const [results, setResults] = useState<StudentResultWithDetails[]>([])
   const [showAvatarSelector, setShowAvatarSelector] = useState(false)
   const [selectedClassroom, setSelectedClassroom] = useState<ClassroomWithDetails | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [joinCode, setJoinCode] = useState("")
+  const [joinError, setJoinError] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedLeaderboard, setSelectedLeaderboard] = useState<Awaited<ReturnType<typeof getClassroomLeaderboard>>>([])
+  const [presenceNotification, setPresenceNotification] = useState<PresenceNotification | null>(null)
+  const [connectedStudentsByClassroom, setConnectedStudentsByClassroom] = useState<ConnectedStudentsByClassroom>({})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const seenPresenceEventsRef = useRef<Set<string>>(new Set())
 
-  useEffect(() => {
-    setClassrooms(getStudentClassrooms(user.id))
-    setResults(getStudentResults(user.id))
-  }, [user.id])
+  const loadStudentData = async () => {
+    setIsLoading(true)
+    try {
+      const [nextClassrooms, nextResults] = await Promise.all([
+        getStudentClassrooms(),
+        getStudentResults(),
+      ])
 
-  useEffect(() => {
-    const refreshedClassrooms = getStudentClassrooms(user.id)
-    const refreshedResults = getStudentResults(user.id)
+      setClassrooms(nextClassrooms)
+      setResults(nextResults)
 
-    setClassrooms(refreshedClassrooms)
-    setResults(refreshedResults)
-
-    if (selectedClassroom) {
-      const updatedSelectedClassroom = refreshedClassrooms.find(c => c.id === selectedClassroom.id) || null
-      setSelectedClassroom(updatedSelectedClassroom)
-    }
-  }, [user.id, selectedClassroom?.id])
-
-  // Calculate total stats
-  const totalScore = results.reduce((sum, r) => sum + r.score, 0)
-  const completedChallenges = results.length
-  const avgScore = completedChallenges > 0 ? Math.round(totalScore / completedChallenges) : 0
-  const currentStreak = Math.min(completedChallenges, 5) // Mock streak
-
-  const handleAvatarChange = (avatarId: string, name?: string) => {
-    const updated = updateUserProfile(user.id, {
-      avatarId,
-      name: name?.trim() ? name.trim() : user.name,
-    })
-    if (updated) {
-      onUserUpdate(updated)
-      setShowConfetti(true)
-      setTimeout(() => setShowConfetti(false), 3000)
+      if (selectedClassroom) {
+        const refreshed = nextClassrooms.find((classroom) => classroom.id === selectedClassroom.id) || null
+        setSelectedClassroom(refreshed)
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  useEffect(() => {
+    void loadStudentData()
+  }, [user.id])
+
+  useEffect(() => {
+    if (typeof Audio === "undefined") {
+      return
+    }
+
+    const audio = new Audio("/audio/friendConnected.mp3")
+    audio.preload = "auto"
+    audioRef.current = audio
+
+    return () => {
+      audio.pause()
+      audioRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedClassroom) {
+      return
+    }
+
+    let isActive = true
+    const classroomId = selectedClassroom.id
+    const unsubscribe = subscribeToGameplayStream(classroomId, {
+      onSubscribed: () => {
+        if (!isActive) {
+          return
+        }
+
+        setConnectedStudentsByClassroom((currentState) => {
+          const existingStudentIds = currentState[classroomId] || []
+          if (existingStudentIds.includes(user.id)) {
+            return currentState
+          }
+
+          return {
+            ...currentState,
+            [classroomId]: [...existingStudentIds, user.id],
+          }
+        })
+      },
+      onStudentConnected: (event) => {
+        if (!isActive || event.studentId === user.id) {
+          return
+        }
+
+        const eventKey = `${event.classroomId}:${event.studentId}:${event.happenedAt}`
+        if (seenPresenceEventsRef.current.has(eventKey)) {
+          return
+        }
+
+        seenPresenceEventsRef.current.add(eventKey)
+        if (seenPresenceEventsRef.current.size > 100) {
+          const oldestKey = seenPresenceEventsRef.current.values().next().value
+          if (oldestKey) {
+            seenPresenceEventsRef.current.delete(oldestKey)
+          }
+        }
+
+        setConnectedStudentsByClassroom((currentState) => {
+          const existingStudentIds = currentState[event.classroomId] || []
+          if (existingStudentIds.includes(event.studentId)) {
+            return currentState
+          }
+
+          return {
+            ...currentState,
+            [event.classroomId]: [...existingStudentIds, event.studentId],
+          }
+        })
+
+        setPresenceNotification({
+          id: eventKey,
+          classroomName: selectedClassroom.name,
+          studentName: event.studentName,
+          avatarId: event.avatarId || "animal-1",
+          message: event.message || `${event.studentName} connected to the classroom.`,
+        })
+
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0
+          void audioRef.current.play().catch(() => undefined)
+        }
+      },
+      onStudentDisconnected: (event) => {
+        if (!isActive || event.studentId === user.id) {
+          return
+        }
+
+        setConnectedStudentsByClassroom((currentState) => {
+          const existingStudentIds = currentState[event.classroomId] || []
+          const nextStudentIds = existingStudentIds.filter((studentId) => studentId !== event.studentId)
+
+          if (nextStudentIds.length === existingStudentIds.length) {
+            return currentState
+          }
+
+          return {
+            ...currentState,
+            [event.classroomId]: nextStudentIds,
+          }
+        })
+      },
+    })
+
+    return () => {
+      isActive = false
+      unsubscribe()
+      setConnectedStudentsByClassroom((currentState) => {
+        const nextState = { ...currentState }
+        delete nextState[classroomId]
+        return nextState
+      })
+    }
+  }, [selectedClassroom, user.id])
+
+  useEffect(() => {
+    if (!presenceNotification) {
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      setPresenceNotification((currentNotification) =>
+        currentNotification?.id === presenceNotification.id ? null : currentNotification
+      )
+    }, 5000)
+
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [presenceNotification])
+
+  const totalScore = useMemo(
+    () => results.reduce((sum, result) => sum + result.score, 0),
+    [results]
+  )
+  const completedChallenges = results.length
+  const avgScore = completedChallenges > 0 ? Math.round(totalScore / completedChallenges) : 0
+  const currentStreak = Math.min(completedChallenges, 5)
+
+  const handleAvatarChange = async (avatarId: string, name?: string) => {
+    const updated = await updateProfile({
+      avatarId,
+      name: name?.trim() ? name.trim() : user.name,
+    })
+    onUserUpdate(updated)
+    setShowConfetti(true)
+    setTimeout(() => setShowConfetti(false), 3000)
+  }
+
+  const handleJoinClassroom = async () => {
+    setJoinError("")
+    try {
+      await joinClassroom(joinCode.trim().toUpperCase())
+      setJoinCode("")
+      await loadStudentData()
+    } catch (error) {
+      setJoinError(error instanceof Error ? error.message : "Could not join the classroom.")
+    }
+  }
+
+  const openClassroom = async (classroom: ClassroomWithDetails) => {
+    await getGameplayContext(classroom.id).catch(() => undefined)
+    setSelectedClassroom(classroom)
+    setConnectedStudentsByClassroom((currentState) => ({
+      ...currentState,
+      [classroom.id]: [user.id],
+    }))
+    const leaderboard = await getClassroomLeaderboard(classroom.id, classroom.currentWeek).catch(() => [])
+    setSelectedLeaderboard(leaderboard)
+  }
+
+  const presenceNotificationBanner = presenceNotification ? (
+    <AnimatePresence>
+      <motion.div
+        key={presenceNotification.id}
+        initial={{ opacity: 0, y: -24, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -16, scale: 0.98 }}
+        className="fixed right-4 top-4 z-50 w-[min(360px,calc(100vw-2rem))]"
+      >
+        <div className="overflow-hidden rounded-3xl border border-indigo-100 bg-white/95 p-4 shadow-2xl backdrop-blur">
+          <div className="flex items-start gap-3">
+            <img
+              src={getAvatarUrl(presenceNotification.avatarId)}
+              alt={presenceNotification.studentName}
+              className="h-12 w-12 rounded-2xl border-2 border-white bg-white shadow-md"
+              crossOrigin="anonymous"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-indigo-900">
+                {presenceNotification.studentName} joined {presenceNotification.classroomName}
+              </p>
+              <p className="mt-1 text-sm text-indigo-700">{presenceNotification.message}</p>
+            </div>
+            <button
+              onClick={() => setPresenceNotification(null)}
+              className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  ) : null
+
   if (selectedClassroom) {
     return (
-      <StudentClassroomView
-        user={user}
-        classroom={selectedClassroom}
-        onBack={() => setSelectedClassroom(null)}
-        onStartChallenge={onStartChallenge}
-      />
+      <>
+        <StudentClassroomView
+          user={user}
+          classroom={selectedClassroom}
+          results={results.filter((result) => result.classroomId === selectedClassroom.id)}
+          leaderboard={selectedLeaderboard}
+          connectedStudentIds={connectedStudentsByClassroom[selectedClassroom.id] || [user.id]}
+          onBack={() => setSelectedClassroom(null)}
+          onStartChallenge={onStartChallenge}
+        />
+        {presenceNotificationBanner}
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-indigo-50 to-pink-100">
-      {/* Confetti Animation */}
       <AnimatePresence>
         {showConfetti && (
           <motion.div
@@ -134,7 +350,6 @@ export function StudentDashboard({
         )}
       </AnimatePresence>
 
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg shadow-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between p-4">
           <div className="flex items-center gap-3">
@@ -148,10 +363,7 @@ export function StudentDashboard({
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowAvatarSelector(true)}
-              className="relative"
-            >
+            <button onClick={() => setShowAvatarSelector(true)} className="relative">
               <motion.img
                 whileHover={{ scale: 1.1 }}
                 src={getAvatarUrl(user.avatarId)}
@@ -178,25 +390,19 @@ export function StudentDashboard({
       </header>
 
       <main className="mx-auto max-w-6xl p-4 pb-24">
-        {/* Welcome Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <h1 className="text-2xl font-black text-indigo-900 md:text-3xl">
-            Hola, <span className="text-pink-500">{user.name.split(" ")[0]}</span>!
+            Hi, <span className="text-pink-500">{user.name.split(" ")[0]}</span>!
           </h1>
-          <p className="text-indigo-600">Listo para el reto de hoy?</p>
+          <p className="text-indigo-600">Ready for today's challenge?</p>
         </motion.div>
 
-        {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             {
               icon: Trophy,
               value: totalScore,
-              label: "Puntos Totales",
+              label: "Total Points",
               color: "from-yellow-400 to-orange-500",
               iconBg: "bg-yellow-100",
               iconColor: "text-yellow-600",
@@ -204,7 +410,7 @@ export function StudentDashboard({
             {
               icon: Target,
               value: completedChallenges,
-              label: "Retos Completados",
+              label: "Completed Challenges",
               color: "from-green-400 to-emerald-500",
               iconBg: "bg-green-100",
               iconColor: "text-green-600",
@@ -212,7 +418,7 @@ export function StudentDashboard({
             {
               icon: Star,
               value: `${avgScore}%`,
-              label: "Promedio",
+              label: "Average Score",
               color: "from-blue-400 to-indigo-500",
               iconBg: "bg-blue-100",
               iconColor: "text-blue-600",
@@ -220,7 +426,7 @@ export function StudentDashboard({
             {
               icon: Flame,
               value: currentStreak,
-              label: "Racha de Dias",
+              label: "Day Streak",
               color: "from-red-400 to-pink-500",
               iconBg: "bg-red-100",
               iconColor: "text-red-600",
@@ -243,11 +449,39 @@ export function StudentDashboard({
           ))}
         </div>
 
-        {/* Classrooms */}
+        <div className="mb-8 rounded-3xl bg-white p-5 shadow-lg">
+          <div className="mb-3 flex items-center gap-2">
+            <Plus className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-black text-indigo-900">Join a Classroom</h2>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              value={joinCode}
+              onChange={(e) => {
+                setJoinCode(e.target.value.toUpperCase())
+                setJoinError("")
+              }}
+              placeholder="Classroom code"
+              maxLength={10}
+              className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-3 font-semibold uppercase tracking-[0.2em] text-gray-900 outline-none transition-colors focus:border-indigo-400"
+            />
+            <button
+              onClick={() => {
+                void handleJoinClassroom()
+              }}
+              disabled={joinCode.trim().length < 4}
+              className="rounded-2xl bg-gradient-to-r from-indigo-500 to-pink-500 px-6 py-3 font-bold text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Join
+            </button>
+          </div>
+          {joinError && <p className="mt-3 text-sm text-red-600">{joinError}</p>}
+        </div>
+
         <div className="mb-8">
           <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-indigo-900">
             <Sparkles className="h-6 w-6 text-yellow-500" />
-            Mis Aulas
+            My Classrooms
           </h2>
 
           {classrooms.length === 0 ? (
@@ -259,20 +493,16 @@ export function StudentDashboard({
               <div className="mb-4 rounded-full bg-indigo-100 p-6">
                 <Users className="h-12 w-12 text-indigo-500" />
               </div>
-              <h3 className="mb-2 text-lg font-bold text-gray-900">
-                No estas en ninguna aula
-              </h3>
-              <p className="text-gray-500">Pide a tu profesor el codigo para unirte</p>
+              <h3 className="mb-2 text-lg font-bold text-gray-900">You are not in any classroom yet</h3>
+              <p className="text-gray-500">Use your teacher's code to join one</p>
             </motion.div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {classrooms.map((classroom, index) => {
-                const activeTopic = getActiveTopicForClassroom(classroom.id)
-                const classroomResults = results.filter(
-                  (r) => r.classroomId === classroom.id
-                )
+                const activeTopic = getActiveTopic(classroom)
+                const classroomResults = results.filter((result) => result.classroomId === classroom.id)
                 const hasCompletedCurrentWeek = classroomResults.some(
-                  (r) => r.weekNumber === classroom.currentWeek
+                  (result) => result.weekNumber === classroom.currentWeek
                 )
 
                 return (
@@ -283,10 +513,11 @@ export function StudentDashboard({
                     transition={{ delay: index * 0.1 }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setSelectedClassroom(classroom)}
+                    onClick={() => {
+                      void openClassroom(classroom)
+                    }}
                     className="relative overflow-hidden rounded-3xl bg-white p-5 text-left shadow-lg transition-shadow hover:shadow-xl"
                   >
-                    {/* Decorative gradient */}
                     <div
                       className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-30"
                       style={{
@@ -305,9 +536,7 @@ export function StudentDashboard({
                         <div
                           className="flex h-10 w-10 items-center justify-center rounded-xl"
                           style={{
-                            backgroundColor: activeTopic
-                              ? activeTopic.color + "20"
-                              : "#6366f120",
+                            backgroundColor: activeTopic ? activeTopic.color + "20" : "#6366f120",
                           }}
                         >
                           <Zap
@@ -321,12 +550,12 @@ export function StudentDashboard({
                         <div className="mb-3 rounded-2xl bg-gradient-to-r from-indigo-50 to-pink-50 p-3">
                           <div className="mb-1 flex items-center gap-2">
                             <span className="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-bold text-white">
-                              Semana {classroom.currentWeek}
+                              Week {classroom.currentWeek}
                             </span>
                             {hasCompletedCurrentWeek && (
                               <span className="flex items-center gap-1 text-xs font-bold text-green-600">
                                 <Star className="h-3 w-3" fill="currentColor" />
-                                Completado
+                                Completed
                               </span>
                             )}
                           </div>
@@ -334,14 +563,14 @@ export function StudentDashboard({
                         </div>
                       ) : (
                         <div className="mb-3 rounded-2xl bg-gray-100 p-3">
-                          <p className="text-sm text-gray-500">Sin reto activo</p>
+                          <p className="text-sm text-gray-500">No active challenge</p>
                         </div>
                       )}
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Users className="h-4 w-4" />
-                          {classroom.students?.length || 0} companeros
+                          {classroom.students?.length || 0} classmates
                         </div>
                         <ChevronRight className="h-5 w-5 text-gray-400" />
                       </div>
@@ -353,12 +582,11 @@ export function StudentDashboard({
           )}
         </div>
 
-        {/* Recent Activity */}
         {results.length > 0 && (
           <div>
             <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-indigo-900">
               <Medal className="h-6 w-6 text-yellow-500" />
-              Actividad Reciente
+              Recent Activity
             </h2>
 
             <div className="space-y-3">
@@ -377,7 +605,7 @@ export function StudentDashboard({
                     <Zap className="h-6 w-6" style={{ color: result.topic?.color || "#6366f1" }} />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-gray-900">{result.topic?.name || "Reto"}</p>
+                    <p className="font-bold text-gray-900">{result.topic?.name || "Challenge"}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Clock className="h-3 w-3" />
                       {Math.round(result.timeSpent / 60)}m
@@ -388,8 +616,8 @@ export function StudentDashboard({
                       result.score >= 80
                         ? "bg-green-100 text-green-700"
                         : result.score >= 60
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
                     }`}
                   >
                     {result.score}%
@@ -401,18 +629,22 @@ export function StudentDashboard({
         )}
       </main>
 
-      {/* Avatar Selector Modal */}
       <AnimatePresence>
         {showAvatarSelector && (
           <AvatarSelector
             currentAvatarId={user.avatarId}
             currentName={user.name}
             showNameField
-            onSelect={handleAvatarChange}
+            onSelect={(avatarId, name) => {
+              void handleAvatarChange(avatarId, name)
+            }}
             onClose={() => setShowAvatarSelector(false)}
           />
         )}
       </AnimatePresence>
+
+      {isLoading && <div className="fixed inset-x-0 top-0 h-1 animate-pulse bg-indigo-500" />}
+      {presenceNotificationBanner}
     </div>
   )
 }

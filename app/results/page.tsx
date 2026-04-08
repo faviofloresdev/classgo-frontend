@@ -18,7 +18,7 @@ function ResultsPageContent() {
     answers: [],
   }
 
-  return <ResultsScreen gameState={gameState} onBackToHome={() => router.replace("/")} />
+  return <ResultsScreen gameState={gameState} currentUser={null} onBackToHome={() => router.replace("/")} />
 }
 
 export default function ResultsPage() {

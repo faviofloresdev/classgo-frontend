@@ -14,6 +14,13 @@ const participants = [
 ]
 
 export default function ClassroomPage() {
+  const secondRowParticipants: Array<{ name: string; avatar: string; color: string; isYou?: boolean }> = [
+    { name: "You", avatar: "A", color: "bg-gradient-to-br from-primary to-accent", isYou: true },
+    ...participants.slice(4, 5),
+    { name: "Leo", avatar: "Le", color: "bg-cyan-400" },
+    { name: "Ava", avatar: "Av", color: "bg-rose-400" },
+  ]
+
   return (
     <main className="min-h-screen px-4 py-6">
       <div className="mx-auto max-w-md space-y-6">
@@ -56,12 +63,7 @@ export default function ClassroomPage() {
                 </div>
 
                 <div className="flex justify-center gap-3">
-                  {[
-                    { name: "You", avatar: "A", color: "bg-gradient-to-br from-primary to-accent", isYou: true },
-                    ...participants.slice(4, 5),
-                    { name: "Leo", avatar: "Le", color: "bg-cyan-400" },
-                    { name: "Ava", avatar: "Av", color: "bg-rose-400" },
-                  ].map((p, i) => (
+                  {secondRowParticipants.map((p, i) => (
                     <div key={i} className="flex flex-col items-center">
                       <Avatar className={`size-8 border-2 shadow-md ${p.isYou ? "border-yellow-400 ring-2 ring-yellow-400/50" : "border-white"} ${p.color}`}>
                         <AvatarFallback className={`${p.color} text-white text-xs font-bold`}>{p.avatar}</AvatarFallback>

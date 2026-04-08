@@ -82,7 +82,7 @@ export function ClassroomDetail({
         </motion.button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{classroom.name}</h1>
-          <p className="text-muted-foreground">Codigo: {classroom.code}</p>
+          <p className="text-muted-foreground">Code: {classroom.code}</p>
         </div>
       </div>
 
@@ -100,8 +100,8 @@ export function ClassroomDetail({
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="mb-2 text-sm font-medium text-white/80">Semana Actual</p>
-              <h2 className="text-3xl font-bold">{displayedWeek || "Sin iniciar"}</h2>
+              <p className="mb-2 text-sm font-medium text-white/80">Current Week</p>
+              <h2 className="text-3xl font-bold">{displayedWeek || "Not started"}</h2>
             </div>
             {activeTopic && (
               <div className="rounded-xl px-4 py-2" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
@@ -118,7 +118,7 @@ export function ClassroomDetail({
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <Users className="h-4 w-4" />
-              <span className="text-sm">Estudiantes</span>
+              <span className="text-sm">Students</span>
             </div>
             <p className="mt-1 text-2xl font-bold text-foreground">
               {classroom.students?.length || 0}
@@ -127,21 +127,21 @@ export function ClassroomDetail({
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <CheckCircle2 className="h-4 w-4" />
-              <span className="text-sm">Completados</span>
+              <span className="text-sm">Completed</span>
             </div>
             <p className="mt-1 text-2xl font-bold text-foreground">{completedStudents}</p>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <Trophy className="h-4 w-4" />
-              <span className="text-sm">Promedio</span>
+              <span className="text-sm">Average</span>
             </div>
             <p className="mt-1 text-2xl font-bold text-foreground">{avgScore}%</p>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <XCircle className="h-4 w-4" />
-              <span className="text-sm">Pendientes</span>
+              <span className="text-sm">Pending</span>
             </div>
             <p className="mt-1 text-2xl font-bold text-foreground">
               {(classroom.students?.length || 0) - completedStudents}
@@ -159,7 +159,7 @@ export function ClassroomDetail({
                 disabled={classroom.currentWeek <= 1}
                 className="w-full rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Retroceder a Semana {Math.max(classroom.currentWeek - 1, 1)}
+                Go Back to Week {Math.max(classroom.currentWeek - 1, 1)}
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.01 }}
@@ -168,7 +168,7 @@ export function ClassroomDetail({
                 className="w-full rounded-xl py-3 font-semibold text-white"
                 style={{ backgroundColor: activeColor }}
               >
-                Avanzar a Semana {classroom.currentWeek + 1}
+                Move to Week {classroom.currentWeek + 1}
               </motion.button>
             </div>
           </div>
@@ -178,7 +178,7 @@ export function ClassroomDetail({
       {/* Students List */}
       <div className="rounded-2xl border border-border bg-card p-6">
         <h3 className="mb-4 text-lg font-bold text-foreground">
-          Estudiantes - Semana {displayedWeek}
+          Students - Week {displayedWeek}
         </h3>
 
         {classroom.students && classroom.students.length > 0 ? (
@@ -202,7 +202,7 @@ export function ClassroomDetail({
                   <div className="flex-1">
                     <p className="font-semibold text-foreground">{student.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {result ? `Completado - ${result.score}%` : "Pendiente"}
+                      {result ? `Completed - ${result.score}%` : "Pending"}
                     </p>
                   </div>
                   {result ? (
@@ -225,7 +225,7 @@ export function ClassroomDetail({
                     </div>
                   ) : (
                     <span className="rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
-                      Pendiente
+                      Pending
                     </span>
                   )}
                 </motion.div>
@@ -234,7 +234,7 @@ export function ClassroomDetail({
           </div>
         ) : (
           <p className="py-8 text-center text-muted-foreground">
-            No hay estudiantes en esta aula
+            There are no students in this classroom
           </p>
         )}
       </div>
@@ -247,7 +247,7 @@ export function ClassroomDetail({
             className="flex w-full items-center justify-between p-6"
           >
             <h3 className="text-lg font-bold text-foreground">
-              Historial de Semanas ({pastWeeks.length})
+              Week History ({pastWeeks.length})
             </h3>
             {showHistory ? (
               <ChevronUp className="h-5 w-5 text-muted-foreground" />
@@ -282,14 +282,14 @@ export function ClassroomDetail({
                           style={selectedWeek === week ? { borderColor: activeColor, backgroundColor: activeColorSoft } : undefined}
                         >
                           <div>
-                            <p className="font-semibold text-foreground">Semana {week}</p>
+                            <p className="font-semibold text-foreground">Week {week}</p>
                             <p className="text-sm text-muted-foreground">
-                              {weekResults.length} resultados
+                              {weekResults.length} results
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-foreground">{weekAvg}%</p>
-                            <p className="text-sm text-muted-foreground">promedio</p>
+                            <p className="text-sm text-muted-foreground">average</p>
                           </div>
                         </button>
                       )

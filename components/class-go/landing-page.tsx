@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { BookOpen, Gamepad2, Trophy, Users, Zap } from "lucide-react"
@@ -36,6 +37,24 @@ const features = [
 ]
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
+  const introAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    const audio = new Audio("/audio/intro.mp3")
+    audio.volume = 0.35
+    audio.loop = true
+    introAudioRef.current = audio
+
+    void audio.play().catch(() => {
+      // Some browsers require user interaction before playback.
+    })
+
+    return () => {
+      audio.pause()
+      audio.currentTime = 0
+    }
+  }, [])
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}

@@ -69,8 +69,8 @@ export function PlanManager({
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Mis Planes</h2>
-            <p className="text-muted-foreground">Organiza topicos por semana</p>
+            <h2 className="text-2xl font-bold text-foreground">My Plans</h2>
+            <p className="text-muted-foreground">Organize topics by week</p>
           </div>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -81,7 +81,7 @@ export function PlanManager({
             className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
           >
             <Zap className="h-5 w-5" />
-            Crear Topico
+            Create Topic
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -93,7 +93,7 @@ export function PlanManager({
             className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
           >
             <Plus className="h-5 w-5" />
-            Nuevo Plan
+            New Plan
           </motion.button>
         </div>
       </div>
@@ -108,15 +108,15 @@ export function PlanManager({
           <div className="mb-4 rounded-full bg-primary/10 p-4">
             <Calendar className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-foreground">No tienes planes aun</h3>
+          <h3 className="mb-2 text-lg font-semibold text-foreground">You don't have any plans yet</h3>
           <p className="mb-6 text-center text-muted-foreground">
-            Crea un plan para organizar los topicos semanales
+            Create a plan to organize weekly topics
           </p>
           <button
             onClick={onCreatePlan}
             className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
           >
-            Crear Plan
+            Create Plan
           </button>
         </motion.div>
       ) : (
@@ -144,14 +144,14 @@ export function PlanManager({
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {plan.activationMode === "auto" ? "Automatico" : "Manual"}
+                      {plan.activationMode === "auto" ? "Automatic" : "Manual"}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                   <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{plan.topics.length} topicos</span>
+                    <span>{plan.topics.length} topics</span>
                     {plan.startDate && (
-                      <span>Inicio: {new Date(plan.startDate).toLocaleDateString()}</span>
+                      <span>Start: {new Date(plan.startDate).toLocaleDateString()}</span>
                     )}
                   </div>
                 </div>
@@ -185,7 +185,7 @@ export function PlanManager({
                             className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted"
                           >
                             <Edit3 className="h-4 w-4" />
-                            Editar
+                            Edit
                           </button>
                           <hr className="my-2 border-border" />
                           <button
@@ -197,7 +197,7 @@ export function PlanManager({
                             className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="h-4 w-4" />
-                            Eliminar
+                            Delete
                           </button>
                         </motion.div>
                       )}
@@ -226,7 +226,7 @@ export function PlanManager({
                     <div className="p-5">
                       {plan.topics.length === 0 ? (
                         <p className="py-4 text-center text-muted-foreground">
-                          No hay topicos en este plan
+                          There are no topics in this plan
                         </p>
                       ) : (
                         <Reorder.Group
@@ -256,18 +256,18 @@ export function PlanManager({
                               <div className="flex-1">
                                 <div className="font-semibold text-foreground">{pt.topic.name}</div>
                                 <div className="text-sm text-muted-foreground">
-                                  Semana {pt.weekNumber}
+                                  Week {pt.weekNumber}
                                 </div>
                               </div>
                               {pt.isActive && (
                                 <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                                  Activo
+                                  Active
                                 </span>
                               )}
                               <button
                                 onClick={() => onActivateWeek(plan.id, pt.weekNumber)}
                                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                                title="Activar semana"
+                                title="Activate week"
                               >
                                 <Play className="h-4 w-4" />
                               </button>
@@ -288,7 +288,7 @@ export function PlanManager({
                         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                       >
                         <Plus className="h-5 w-5" />
-                        Agregar Topico
+                        Add Topic
                       </button>
                     </div>
                   </motion.div>
@@ -317,7 +317,7 @@ export function PlanManager({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-foreground">Agregar Topico</h3>
+                <h3 className="text-lg font-bold text-foreground">Add Topic</h3>
                 <button
                   onClick={() => setShowAddTopic(null)}
                   className="rounded-full p-2 text-muted-foreground hover:bg-muted"
@@ -330,7 +330,7 @@ export function PlanManager({
                 {getAvailableTopics(showAddTopic).length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-muted/30 p-5 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No hay topicos disponibles. Crea nuevos topicos y luego agregalos al plan.
+                      There are no available topics. Create new topics and then add them to the plan.
                     </p>
                     <button
                       onClick={() => {
@@ -340,7 +340,7 @@ export function PlanManager({
                       className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       <Plus className="h-4 w-4" />
-                      Crear Topico
+                      Create Topic
                     </button>
                   </div>
                 ) : (

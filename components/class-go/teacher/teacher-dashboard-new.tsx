@@ -1,45 +1,40 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
+import { BookOpen, Lightbulb, LogOut, Settings, Users } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getAvatarUrl } from "@/lib/avatars"
+import type { ClassroomWithDetails, Plan, PlanWithTopics, StudentResultWithDetails, Topic, User } from "@/lib/types"
 import {
-  Users,
-  BookOpen,
-  Lightbulb,
-  LogOut,
-  Settings,
-} from "lucide-react"
-import type { User, ClassroomWithDetails, PlanWithTopics, Topic, Classroom, Plan } from "@/lib/types"
-import { AvatarSelector } from "../avatar-selector"
-import { ClassroomManager } from "./classroom-manager"
-import { ClassroomForm } from "./classroom-form"
-import { ClassroomDetail } from "./classroom-detail"
-import { PlanManager } from "./plan-manager"
-import { PlanForm } from "./plan-form"
-import { TopicManager } from "./topic-manager"
-import { TopicForm } from "./topic-form"
-import {
+  activatePlanWeek,
+  addTopicToPlan,
+  assignPlan,
+  createClassroom,
+  createPlan,
+  createTopic,
+  deleteClassroom,
+  deletePlan,
+  deleteTopic,
+  getTeacherClassroomDetail,
   getTeacherClassrooms,
   getTeacherPlans,
   getTeacherTopics,
-  getClassroomResults,
-  createClassroom,
-  updateClassroom,
-  deleteClassroom,
-  createPlan,
-  updatePlan,
-  deletePlan,
-  createTopic,
-  updateTopic,
-  deleteTopic,
-  addTopicToPlan,
-  removeTopicFromPlan,
   reorderPlanTopics,
-  activateWeekTopic,
-  updateUserAvatar,
-  plans as allPlans,
-  classrooms as allClassrooms,
-} from "@/lib/store"
+  removeTopicFromPlan,
+  updateClassroom,
+  updatePlan,
+  updateProfile,
+  updateTopic,
+} from "@/lib/api"
+import { AvatarSelector } from "../avatar-selector"
+import { ClassroomDetail } from "./classroom-detail"
+import { ClassroomForm } from "./classroom-form"
+import { ClassroomManager } from "./classroom-manager"
+import { PlanForm } from "./plan-form"
+import { PlanManager } from "./plan-manager"
+import { TopicForm } from "./topic-form"
+import { TopicManager } from "./topic-manager"
 
 type TabId = "classrooms" | "plans" | "topics"
 
@@ -50,18 +45,12 @@ interface TeacherDashboardNewProps {
 }
 
 export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDashboardNewProps) {
-  // State
   const [activeTab, setActiveTab] = useState<TabId>("classrooms")
   const [showAvatarSelector, setShowAvatarSelector] = useState(false)
-
-  // Data state (in real app, use SWR)
-  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>(() =>
-    getTeacherClassrooms(user.id)
-  )
-  const [plans, setPlans] = useState<PlanWithTopics[]>(() => getTeacherPlans(user.id))
-  const [topics, setTopics] = useState<Topic[]>(() => getTeacherTopics(user.id))
-
-  // Form states
+  const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>([])
+  const [plans, setPlans] = useState<PlanWithTopics[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [classroomResults, setClassroomResults] = useState<StudentResultWithDetails[]>([])
   const [showClassroomForm, setShowClassroomForm] = useState(false)
   const [editingClassroom, setEditingClassroom] = useState<ClassroomWithDetails | null>(null)
   const [viewingClassroom, setViewingClassroom] = useState<ClassroomWithDetails | null>(null)
@@ -69,151 +58,149 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
   const [editingPlan, setEditingPlan] = useState<PlanWithTopics | null>(null)
   const [showTopicForm, setShowTopicForm] = useState(false)
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const viewingClassroomId = viewingClassroom?.id ?? null
 
-  // Refresh data
-  const refreshData = useCallback(() => {
-    setClassrooms(getTeacherClassrooms(user.id))
-    setPlans(getTeacherPlans(user.id))
-    setTopics(getTeacherTopics(user.id))
-  }, [user.id])
+  const loadDashboardData = useCallback(async () => {
+    const [nextClassrooms, nextPlans, nextTopics] = await Promise.all([
+      getTeacherClassrooms(),
+      getTeacherPlans(),
+      getTeacherTopics(),
+    ])
 
-  // Classroom handlers
-  const handleCreateClassroom = () => {
-    setEditingClassroom(null)
-    setShowClassroomForm(true)
-  }
+    setClassrooms(nextClassrooms)
+    setPlans(nextPlans)
+    setTopics(nextTopics)
+  }, [])
 
-  const handleEditClassroom = (classroom: ClassroomWithDetails) => {
-    setEditingClassroom(classroom)
-    setShowClassroomForm(true)
-  }
+  const refreshData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      await loadDashboardData()
 
-  const handleSaveClassroom = (data: { name: string; code: string; description: string }) => {
-    if (editingClassroom) {
-      updateClassroom(editingClassroom.id, data)
-    } else {
-      createClassroom({
-        ...data,
-        teacherId: user.id,
-        activePlanId: null,
-        currentWeek: 0,
-      })
+      if (viewingClassroomId) {
+        const detail = await getTeacherClassroomDetail(viewingClassroomId)
+        setViewingClassroom(detail.classroom)
+        setClassroomResults(detail.results)
+      }
+    } finally {
+      setIsLoading(false)
     }
+  }, [loadDashboardData, viewingClassroomId])
+
+  useEffect(() => {
+    void refreshData()
+  }, [refreshData])
+
+  const openClassroomDetail = async (classroom: ClassroomWithDetails) => {
+    setIsLoading(true)
+    try {
+      const detail = await getTeacherClassroomDetail(classroom.id)
+      setViewingClassroom(detail.classroom)
+      setClassroomResults(detail.results)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSaveClassroom = async (data: { name: string; code: string; description: string }) => {
+    if (editingClassroom) {
+      await updateClassroom(editingClassroom.id, data)
+    } else {
+      await createClassroom(data)
+    }
+
     setShowClassroomForm(false)
     setEditingClassroom(null)
-    refreshData()
+    await refreshData()
   }
 
-  const handleDeleteClassroom = (classroomId: string) => {
-    if (confirm("Estas seguro de eliminar esta aula?")) {
-      deleteClassroom(classroomId)
-      refreshData()
-    }
+  const handleDeleteClassroom = async (classroomId: string) => {
+    if (!confirm("Are you sure you want to delete this classroom?")) return
+    await deleteClassroom(classroomId)
+    await refreshData()
   }
 
-  const handleAssignPlan = (classroomId: string, planId: string | null) => {
-    updateClassroom(classroomId, { activePlanId: planId, currentWeek: planId ? 1 : 0 })
+  const handleAssignPlan = async (classroomId: string, planId: string | null) => {
+    await assignPlan(classroomId, planId)
+
     if (planId) {
-      activateWeekTopic(planId, 1)
+      await activatePlanWeek(planId, 1).catch(() => undefined)
+      await updateClassroom(classroomId, { currentWeek: 1 })
     }
-    refreshData()
+
+    await refreshData()
   }
 
-  const handleAdvanceWeek = () => {
+  const handleAdvanceWeek = async () => {
     if (!viewingClassroom) return
-    const newWeek = viewingClassroom.currentWeek + 1
-    updateClassroom(viewingClassroom.id, { currentWeek: newWeek })
-    refreshData()
-    setViewingClassroom(getTeacherClassrooms(user.id).find((c) => c.id === viewingClassroom.id) || null)
+    await updateClassroom(viewingClassroom.id, {
+      currentWeek: viewingClassroom.currentWeek + 1,
+    })
+    await refreshData()
   }
 
-  const handlePreviousWeek = () => {
+  const handlePreviousWeek = async () => {
     if (!viewingClassroom || viewingClassroom.currentWeek <= 1) return
-    const previousWeek = viewingClassroom.currentWeek - 1
-    updateClassroom(viewingClassroom.id, { currentWeek: previousWeek })
-    refreshData()
-    setViewingClassroom(getTeacherClassrooms(user.id).find((c) => c.id === viewingClassroom.id) || null)
+    await updateClassroom(viewingClassroom.id, {
+      currentWeek: viewingClassroom.currentWeek - 1,
+    })
+    await refreshData()
   }
 
-  // Plan handlers
-  const handleCreatePlan = () => {
-    console.log("[v0] handleCreatePlan called")
-    setEditingPlan(null)
-    setShowPlanForm(true)
-  }
-
-  const handleEditPlan = (plan: PlanWithTopics) => {
-    setEditingPlan(plan)
-    setShowPlanForm(true)
-  }
-
-  const handleSavePlan = (data: {
+  const handleSavePlan = async (data: {
     name: string
     description: string
     activationMode: "manual" | "auto"
     startDate: Date | null
   }) => {
     if (editingPlan) {
-      updatePlan(editingPlan.id, data)
+      await updatePlan(editingPlan.id, data)
     } else {
-      createPlan({
-        ...data,
-        teacherId: user.id,
-      })
+      await createPlan(data)
     }
+
     setShowPlanForm(false)
     setEditingPlan(null)
-    refreshData()
+    await refreshData()
   }
 
-  const handleDeletePlan = (planId: string) => {
-    if (confirm("Estas seguro de eliminar este plan?")) {
-      deletePlan(planId)
-      refreshData()
-    }
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm("Are you sure you want to delete this plan?")) return
+    await deletePlan(planId)
+    await refreshData()
   }
 
-  const handleAddTopicToPlan = (planId: string, topicId: string) => {
-    const plan = plans.find((p) => p.id === planId)
+  const handleAddTopicToPlan = async (planId: string, topicId: string) => {
+    const plan = plans.find((item) => item.id === planId)
     const weekNumber = (plan?.topics.length || 0) + 1
-    addTopicToPlan(planId, topicId, weekNumber)
-    refreshData()
+    await addTopicToPlan(planId, topicId, weekNumber)
+    await refreshData()
   }
 
-  const handleRemoveTopicFromPlan = (planId: string, topicId: string) => {
-    removeTopicFromPlan(planId, topicId)
-    refreshData()
+  const handleRemoveTopicFromPlan = async (planId: string, topicId: string) => {
+    await removeTopicFromPlan(planId, topicId)
+    await refreshData()
   }
 
-  const handleReorderTopics = (planId: string, orderedTopicIds: string[]) => {
-    reorderPlanTopics(planId, orderedTopicIds)
-    refreshData()
+  const handleReorderTopics = async (planId: string, orderedTopicIds: string[]) => {
+    await reorderPlanTopics(planId, orderedTopicIds)
+    await refreshData()
   }
 
-  const handleActivateWeek = (planId: string, weekNumber: number) => {
-    activateWeekTopic(planId, weekNumber)
-    // Also update classrooms using this plan
-    allClassrooms.forEach((c) => {
-      if (c.activePlanId === planId) {
-        updateClassroom(c.id, { currentWeek: weekNumber })
-      }
-    })
-    refreshData()
+  const handleActivateWeek = async (planId: string, weekNumber: number) => {
+    await activatePlanWeek(planId, weekNumber)
+
+    await Promise.all(
+      classrooms
+        .filter((classroom) => classroom.activePlanId === planId)
+        .map((classroom) => updateClassroom(classroom.id, { currentWeek: weekNumber }))
+    )
+
+    await refreshData()
   }
 
-  // Topic handlers
-  const handleCreateTopic = () => {
-    console.log("[v0] handleCreateTopic called")
-    setEditingTopic(null)
-    setShowTopicForm(true)
-  }
-
-  const handleEditTopic = (topic: Topic) => {
-    setEditingTopic(topic)
-    setShowTopicForm(true)
-  }
-
-  const handleSaveTopic = (data: {
+  const handleSaveTopic = async (data: {
     name: string
     description: string
     icon: string
@@ -222,52 +209,83 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
     questions: Topic["questions"]
   }) => {
     if (editingTopic) {
-      updateTopic(editingTopic.id, data)
+      await updateTopic(editingTopic.id, data)
     } else {
-      createTopic({
-        ...data,
-        teacherId: user.id,
-      })
+      await createTopic(data)
     }
+
     setShowTopicForm(false)
     setEditingTopic(null)
-    refreshData()
+    await refreshData()
   }
 
-  const handleDeleteTopic = (topicId: string) => {
-    if (confirm("Estas seguro de eliminar este topico?")) {
-      deleteTopic(topicId)
-      refreshData()
-    }
+  const handleDeleteTopic = async (topicId: string) => {
+    if (!confirm("Are you sure you want to delete this topic?")) return
+    await deleteTopic(topicId)
+    await refreshData()
   }
 
-  // Avatar handler
-  const handleAvatarChange = (avatarId: string) => {
-    const updated = updateUserAvatar(user.id, avatarId)
-    if (updated) {
-      onUserUpdate(updated)
-    }
+  const handleAvatarChange = async (avatarId: string) => {
+    const updated = await updateProfile({ avatarId })
+    onUserUpdate(updated)
   }
 
-  const tabs = [
-    { id: "classrooms" as const, label: "Aulas", icon: Users },
-    { id: "plans" as const, label: "Planes", icon: BookOpen },
-    { id: "topics" as const, label: "Topicos", icon: Lightbulb },
-  ]
+  const tabs = useMemo(
+    () => [
+      { id: "classrooms" as const, label: "Classrooms", icon: Users },
+      { id: "plans" as const, label: "Plans", icon: BookOpen },
+      { id: "topics" as const, label: "Topics", icon: Lightbulb },
+    ],
+    []
+  )
 
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-7xl p-4 lg:p-8">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">Panel del profesor</p>
-            <h1 className="truncate text-2xl font-bold text-foreground">{user.name}</h1>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted-foreground">Teacher Dashboard</p>
+            <div className="mt-3 flex items-start gap-3">
+              <button
+                onClick={() => setShowAvatarSelector(true)}
+                className="shrink-0 rounded-full transition-transform hover:scale-105"
+                aria-label="Cambiar avatar"
+              >
+                <Avatar className="size-14 border-2 border-white bg-card shadow-md">
+                  <AvatarImage src={getAvatarUrl(user.avatarId)} alt={user.name} crossOrigin="anonymous" />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {user.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+
+              <div className="min-w-0">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <h1 className="break-words text-2xl font-bold text-foreground sm:truncate">{user.name}</h1>
+                  <button
+                    onClick={onLogout}
+                    className="inline-flex w-fit items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/15"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground">Your teacher profile</p>
+              </div>
+            </div>
           </div>
+          <button
+            onClick={() => setShowAvatarSelector(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 font-semibold text-foreground transition-colors hover:bg-muted sm:w-auto"
+          >
+            <Settings className="h-4 w-4" />
+            Profile
+          </button>
         </div>
 
         {!viewingClassroom && !showTopicForm && (
           <div className="mb-4 rounded-3xl border border-border bg-card p-4 shadow-sm lg:p-5">
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -276,41 +294,26 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
                     setViewingClassroom(null)
                     setShowTopicForm(false)
                   }}
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold transition-colors ${
+                  className={`inline-flex min-w-0 items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-semibold transition-colors sm:px-4 sm:text-base ${
                     activeTab === tab.id
                       ? "bg-primary text-primary-foreground"
                       : "border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <tab.icon className="h-5 w-5" />
-                  {tab.label}
+                  <tab.icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+                  <span className="truncate">{tab.label}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <div className="mb-6 flex justify-end gap-2">
-          <button
-            onClick={() => setShowAvatarSelector(true)}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 font-semibold text-foreground transition-colors hover:bg-muted"
-          >
-            <Settings className="h-4 w-4" />
-            Perfil
-          </button>
-          <button
-            onClick={onLogout}
-            className="inline-flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-2 font-semibold text-destructive transition-colors hover:bg-destructive/15"
-          >
-            <LogOut className="h-4 w-4" />
-            Salir
-          </button>
-        </div>
-
         {showTopicForm ? (
           <TopicForm
             topic={editingTopic}
-            onSave={handleSaveTopic}
+            onSave={(data) => {
+              void handleSaveTopic(data)
+            }}
             onClose={() => {
               setShowTopicForm(false)
               setEditingTopic(null)
@@ -319,18 +322,29 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
         ) : viewingClassroom ? (
           <ClassroomDetail
             classroom={viewingClassroom}
-            results={getClassroomResults(viewingClassroom.id)}
+            results={classroomResults}
             onBack={() => setViewingClassroom(null)}
-            onPreviousWeek={handlePreviousWeek}
-            onAdvanceWeek={handleAdvanceWeek}
+            onPreviousWeek={() => {
+              void handlePreviousWeek()
+            }}
+            onAdvanceWeek={() => {
+              void handleAdvanceWeek()
+            }}
           />
         ) : (
           <>
             {activeTab === "classrooms" && (
               <ClassroomManager
                 classrooms={classrooms}
-                plans={allPlans.filter((p) => p.teacherId === user.id)}
-                onCreateClassroom={handleCreateClassroom}
+                plans={plans as Plan[]}
+                onCreateClassroom={() => {
+                  setEditingClassroom(null)
+                  setShowClassroomForm(true)
+                }}
+                onCreatePlan={() => {
+                  setEditingPlan(null)
+                  setShowPlanForm(true)
+                }}
                 onManagePlans={() => {
                   setViewingClassroom(null)
                   setActiveTab("plans")
@@ -339,10 +353,19 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
                   setViewingClassroom(null)
                   setActiveTab("topics")
                 }}
-                onEditClassroom={handleEditClassroom}
-                onDeleteClassroom={handleDeleteClassroom}
-                onViewClassroom={setViewingClassroom}
-                onAssignPlan={handleAssignPlan}
+                onEditClassroom={(classroom) => {
+                  setEditingClassroom(classroom)
+                  setShowClassroomForm(true)
+                }}
+                onDeleteClassroom={(classroomId) => {
+                  void handleDeleteClassroom(classroomId)
+                }}
+                onViewClassroom={(classroom) => {
+                  void openClassroomDetail(classroom)
+                }}
+                onAssignPlan={(classroomId, planId) => {
+                  void handleAssignPlan(classroomId, planId)
+                }}
               />
             )}
 
@@ -351,14 +374,33 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
                 plans={plans}
                 topics={topics}
                 onBack={() => setActiveTab("classrooms")}
-                onCreatePlan={handleCreatePlan}
-                onCreateTopic={handleCreateTopic}
-                onEditPlan={handleEditPlan}
-                onDeletePlan={handleDeletePlan}
-                onAddTopicToPlan={handleAddTopicToPlan}
-                onRemoveTopicFromPlan={handleRemoveTopicFromPlan}
-                onReorderTopics={handleReorderTopics}
-                onActivateWeek={handleActivateWeek}
+                onCreatePlan={() => {
+                  setEditingPlan(null)
+                  setShowPlanForm(true)
+                }}
+                onCreateTopic={() => {
+                  setEditingTopic(null)
+                  setShowTopicForm(true)
+                }}
+                onEditPlan={(plan) => {
+                  setEditingPlan(plan)
+                  setShowPlanForm(true)
+                }}
+                onDeletePlan={(planId) => {
+                  void handleDeletePlan(planId)
+                }}
+                onAddTopicToPlan={(planId, topicId) => {
+                  void handleAddTopicToPlan(planId, topicId)
+                }}
+                onRemoveTopicFromPlan={(planId, topicId) => {
+                  void handleRemoveTopicFromPlan(planId, topicId)
+                }}
+                onReorderTopics={(planId, orderedTopicIds) => {
+                  void handleReorderTopics(planId, orderedTopicIds)
+                }}
+                onActivateWeek={(planId, weekNumber) => {
+                  void handleActivateWeek(planId, weekNumber)
+                }}
               />
             )}
 
@@ -366,22 +408,30 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
               <TopicManager
                 topics={topics}
                 onBack={() => setActiveTab("classrooms")}
-                onCreateTopic={handleCreateTopic}
-                onEditTopic={handleEditTopic}
-                onDeleteTopic={handleDeleteTopic}
+                onCreateTopic={() => {
+                  setEditingTopic(null)
+                  setShowTopicForm(true)
+                }}
+                onEditTopic={(topic) => {
+                  setEditingTopic(topic)
+                  setShowTopicForm(true)
+                }}
+                onDeleteTopic={(topicId) => {
+                  void handleDeleteTopic(topicId)
+                }}
               />
             )}
           </>
         )}
       </main>
 
-      {/* Modals */}
-      {console.log("[v0] Modal states:", { showPlanForm, showTopicForm, showClassroomForm, showAvatarSelector })}
       <AnimatePresence>
         {showClassroomForm && (
           <ClassroomForm
             classroom={editingClassroom}
-            onSave={handleSaveClassroom}
+            onSave={(data) => {
+              void handleSaveClassroom(data)
+            }}
             onClose={() => {
               setShowClassroomForm(false)
               setEditingClassroom(null)
@@ -392,21 +442,28 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
         {showPlanForm && (
           <PlanForm
             plan={editingPlan}
-            onSave={handleSavePlan}
+            onSave={(data) => {
+              void handleSavePlan(data)
+            }}
             onClose={() => {
               setShowPlanForm(false)
               setEditingPlan(null)
             }}
           />
         )}
+
         {showAvatarSelector && (
           <AvatarSelector
             currentAvatarId={user.avatarId}
-            onSelect={handleAvatarChange}
+            onSelect={(avatarId) => {
+              void handleAvatarChange(avatarId)
+            }}
             onClose={() => setShowAvatarSelector(false)}
           />
         )}
       </AnimatePresence>
+
+      {isLoading && <div className="fixed inset-x-0 top-0 h-1 animate-pulse bg-primary" />}
     </div>
   )
 }

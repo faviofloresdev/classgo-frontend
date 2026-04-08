@@ -21,6 +21,7 @@ interface ClassroomManagerProps {
   classrooms: ClassroomWithDetails[]
   plans: Plan[]
   onCreateClassroom: () => void
+  onCreatePlan: () => void
   onManagePlans: () => void
   onManageTopics: () => void
   onEditClassroom: (classroom: ClassroomWithDetails) => void
@@ -33,6 +34,7 @@ export function ClassroomManager({
   classrooms,
   plans,
   onCreateClassroom,
+  onCreatePlan,
   onManagePlans,
   onManageTopics,
   onEditClassroom,
@@ -55,8 +57,8 @@ export function ClassroomManager({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Mis Aulas</h2>
-          <p className="text-muted-foreground">Gestiona tus aulas y estudiantes</p>
+          <h2 className="text-2xl font-bold text-foreground">My Classrooms</h2>
+          <p className="text-muted-foreground">Manage your classrooms and students</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <motion.button
@@ -66,7 +68,7 @@ export function ClassroomManager({
             className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
           >
             <BookOpen className="h-5 w-5" />
-            Gestionar Planes
+            Manage Plans
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -75,7 +77,7 @@ export function ClassroomManager({
             className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
           >
             <BookOpen className="h-5 w-5" />
-            Gestionar Topicos
+            Manage Topics
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -84,7 +86,7 @@ export function ClassroomManager({
             className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
           >
             <Plus className="h-5 w-5" />
-            Nueva Aula
+            New Classroom
           </motion.button>
         </div>
       </div>
@@ -99,15 +101,15 @@ export function ClassroomManager({
           <div className="mb-4 rounded-full bg-primary/10 p-4">
             <Users className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-foreground">No tienes aulas aun</h3>
+          <h3 className="mb-2 text-lg font-semibold text-foreground">You don't have any classrooms yet</h3>
           <p className="mb-6 text-center text-muted-foreground">
-            Crea tu primera aula para comenzar
+            Create your first classroom to get started
           </p>
           <button
             onClick={onCreateClassroom}
             className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
           >
-            Crear Aula
+            Create Classroom
           </button>
         </motion.div>
       ) : (
@@ -118,7 +120,7 @@ export function ClassroomManager({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+              className="group relative overflow-visible rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               {/* Menu Button */}
               <div className="absolute right-3 top-3">
@@ -135,7 +137,7 @@ export function ClassroomManager({
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      className="absolute right-0 top-10 z-10 w-48 rounded-xl border border-border bg-card py-2 shadow-lg"
+                      className="absolute right-0 top-10 z-20 w-48 rounded-xl border border-border bg-card py-2 shadow-lg"
                     >
                       <button
                         onClick={() => {
@@ -145,7 +147,7 @@ export function ClassroomManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted"
                       >
                         <Eye className="h-4 w-4" />
-                        Ver Detalles
+                        View Details
                       </button>
                       <button
                         onClick={() => {
@@ -155,7 +157,7 @@ export function ClassroomManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted"
                       >
                         <Edit3 className="h-4 w-4" />
-                        Editar
+                        Edit
                       </button>
                       <button
                         onClick={() => {
@@ -165,7 +167,7 @@ export function ClassroomManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted"
                       >
                         <BookOpen className="h-4 w-4" />
-                        Asignar Plan
+                        Assign Plan
                       </button>
                       <hr className="my-2 border-border" />
                       <button
@@ -176,7 +178,7 @@ export function ClassroomManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
-                        Eliminar
+                        Delete
                       </button>
                     </motion.div>
                   )}
@@ -199,12 +201,12 @@ export function ClassroomManager({
                 {copiedCode === classroom.code ? (
                   <>
                     <Check className="h-4 w-4" />
-                    Copiado!
+                    Copied!
                   </>
                 ) : (
                   <>
                     <Copy className="h-4 w-4" />
-                    Codigo: {classroom.code}
+                    Code: {classroom.code}
                   </>
                 )}
               </button>
@@ -213,12 +215,12 @@ export function ClassroomManager({
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <Users className="h-4 w-4" />
-                  <span>{classroom.students?.length || 0} estudiantes</span>
+                  <span>{classroom.students?.length || 0} students</span>
                 </div>
                 {classroom.plan && (
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4" />
-                    <span>Semana {classroom.currentWeek}</span>
+                    <span>Week {classroom.currentWeek}</span>
                   </div>
                 )}
               </div>
@@ -237,7 +239,7 @@ export function ClassroomManager({
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                 >
                   <Plus className="h-4 w-4" />
-                  Asignar Plan
+                  Assign Plan
                 </button>
               )}
             </motion.div>
@@ -263,7 +265,7 @@ export function ClassroomManager({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-foreground">Asignar Plan</h3>
+                <h3 className="text-lg font-bold text-foreground">Assign Plan</h3>
                 <button
                   onClick={() => setShowAssignPlan(null)}
                   className="rounded-full p-2 text-muted-foreground hover:bg-muted"
@@ -276,7 +278,7 @@ export function ClassroomManager({
                 {plans.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-muted/30 p-5 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No tienes planes creados todavia. Crea uno primero para asignarlo a esta aula.
+                      You don't have any plans yet. Create one first to assign it to this classroom.
                     </p>
                     <button
                       onClick={() => {
@@ -286,7 +288,7 @@ export function ClassroomManager({
                       className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       <Plus className="h-4 w-4" />
-                      Crear Plan
+                      Create Plan
                     </button>
                   </div>
                 ) : (
@@ -298,7 +300,7 @@ export function ClassroomManager({
                       }}
                       className="w-full rounded-xl border border-border p-4 text-left transition-colors hover:bg-muted"
                     >
-                      <span className="text-muted-foreground">Sin plan asignado</span>
+                      <span className="text-muted-foreground">No plan assigned</span>
                     </button>
                     {plans.map((plan) => (
                       <button

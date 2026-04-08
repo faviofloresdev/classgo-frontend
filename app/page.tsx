@@ -1,14 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LandingPage } from "@/components/class-go/landing-page"
 import { LoginScreen } from "@/components/class-go/login-screen"
 import { TeacherDashboardNew } from "@/components/class-go/teacher/teacher-dashboard-new"
 import { StudentDashboard } from "@/components/class-go/student/student-dashboard"
 import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
-import type { User } from "@/lib/types"
-import { getTopicById, getUserById, users } from "@/lib/store"
+import {
+  getClassroomLeaderboard,
+  getCurrentUser,
+  getGameplayContext,
+  getStoredSession,
+  loginWithEmail,
+  loginWithGoogle,
+  logout,
+  submitResult,
+} from "@/lib/api"
+import type { LeaderboardEntry, StudentResultWithDetails, Topic, User } from "@/lib/types"
 
 export type Screen =
   | "landing"
@@ -25,36 +34,88 @@ export interface GameState {
   answers: { question: string; correct: boolean; selected: string }[]
   classroomId?: string
   topicId?: string
+  topic?: Topic
+  weekNumber?: number
+  startedAt?: number
+  leaderboard?: LeaderboardEntry[]
+  submittedResult?: StudentResultWithDetails | null
+}
+
+const initialGameState: GameState = {
+  currentQuestion: 0,
+  totalQuestions: 0,
+  correctAnswers: 0,
+  answers: [],
+  leaderboard: [],
+  submittedResult: null,
 }
 
 export default function ClassGoApp() {
   const [screen, setScreen] = useState<Screen>("landing")
   const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [gameState, setGameState] = useState<GameState>({
-    currentQuestion: 0,
-    totalQuestions: 10,
-    correctAnswers: 0,
-    answers: [],
-  })
+  const [gameState, setGameState] = useState<GameState>(initialGameState)
+  const [isBootstrapping, setIsBootstrapping] = useState(true)
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      const session = getStoredSession()
+      if (!session) {
+        setIsBootstrapping(false)
+        return
+      }
+
+      try {
+        const user = await getCurrentUser()
+        setCurrentUser(user)
+        setScreen(user.role === "teacher" ? "teacher-dashboard" : "student-dashboard")
+      } catch {
+        await logout().catch(() => undefined)
+      } finally {
+        setIsBootstrapping(false)
+      }
+    }
+
+    void restoreSession()
+  }, [])
 
   const handleGetStarted = () => {
     setScreen("login")
   }
 
-  const handleLogin = (role: "teacher" | "student") => {
-    // Mock login - in production, this would be real authentication
-    const mockUser = role === "teacher" 
-      ? users.find(u => u.role === "teacher") 
-      : users.find(u => u.role === "student")
-    
-    if (mockUser) {
-      setCurrentUser(mockUser)
-      setScreen(role === "teacher" ? "teacher-dashboard" : "student-dashboard")
+  const handleTeacherLogin = async (email: string, password: string) => {
+    const session = await loginWithEmail(email, password)
+
+    if (session.user.role !== "teacher") {
+      await logout()
+      throw new Error("This account does not belong to a teacher.")
     }
+
+    setCurrentUser(session.user)
+    setScreen("teacher-dashboard")
   }
 
-  const handleLogout = () => {
+  const handleStudentLogin = async (email: string, password: string) => {
+    const session = await loginWithEmail(email, password)
+
+    if (session.user.role !== "student") {
+      await logout()
+      throw new Error("This account does not belong to a student.")
+    }
+
+    setCurrentUser(session.user)
+    setScreen("student-dashboard")
+  }
+
+  const handleGoogleLogin = async (role: "teacher" | "student", idToken: string) => {
+    const session = await loginWithGoogle(idToken, role)
+    setCurrentUser(session.user)
+    setScreen(session.user.role === "teacher" ? "teacher-dashboard" : "student-dashboard")
+  }
+
+  const handleLogout = async () => {
+    await logout().catch(() => undefined)
     setCurrentUser(null)
+    setGameState(initialGameState)
     setScreen("landing")
   }
 
@@ -62,21 +123,88 @@ export default function ClassGoApp() {
     setCurrentUser(updatedUser)
   }
 
-  const handleStartChallenge = (classroomId: string, topicId: string) => {
-    const topic = getTopicById(topicId)
+  const handleStartChallenge = async (classroomId: string) => {
+    const context = await getGameplayContext(classroomId)
+
+    if (!context.topic) {
+      throw new Error("This classroom does not have an active challenge.")
+    }
+
+    if (!context.attemptAllowed && context.existingResult) {
+      setGameState({
+        currentQuestion: context.existingResult.totalQuestions || 0,
+        totalQuestions: context.existingResult.totalQuestions || 0,
+        correctAnswers: context.existingResult.correctAnswers || 0,
+        answers: Array.isArray(context.existingResult.answers)
+          ? (context.existingResult.answers as GameState["answers"])
+          : [],
+        classroomId,
+        topicId: context.topic.id,
+        topic: context.topic,
+        weekNumber: context.currentWeek,
+        leaderboard: await getClassroomLeaderboard(classroomId, context.currentWeek).catch(() => []),
+        submittedResult: context.existingResult,
+      })
+      setScreen("results")
+      return
+    }
+
     setGameState({
       currentQuestion: 0,
-      totalQuestions: topic?.questions.length || 1,
+      totalQuestions: context.topic.questions.length,
       correctAnswers: 0,
       answers: [],
       classroomId,
-      topicId,
+      topicId: context.topic.id,
+      topic: context.topic,
+      weekNumber: context.currentWeek,
+      startedAt: Date.now(),
+      leaderboard: [],
+      submittedResult: null,
     })
     setScreen("gameplay")
   }
 
-  const handleGameComplete = (finalState: GameState) => {
-    setGameState(finalState)
+  const handleRetryChallenge = async () => {
+    if (!gameState.classroomId) return
+    await handleStartChallenge(gameState.classroomId)
+  }
+
+  const handleGameComplete = async (finalState: GameState) => {
+    if (!finalState.classroomId || !finalState.topicId || !finalState.weekNumber) {
+      setGameState(finalState)
+      setScreen("results")
+      return
+    }
+
+    const timeSpent = Math.max(
+      1,
+      finalState.startedAt ? Math.round((Date.now() - finalState.startedAt) / 1000) : 1
+    )
+    const safeTotalQuestions = Math.max(finalState.totalQuestions, 1)
+    const score = Math.round((finalState.correctAnswers / safeTotalQuestions) * 100)
+
+    const submittedResult = await submitResult({
+      classroomId: finalState.classroomId,
+      topicId: finalState.topicId,
+      weekNumber: finalState.weekNumber,
+      score,
+      timeSpent,
+      correctAnswers: finalState.correctAnswers,
+      totalQuestions: finalState.totalQuestions,
+      answers: finalState.answers,
+    })
+
+    const leaderboard = await getClassroomLeaderboard(
+      finalState.classroomId,
+      finalState.weekNumber
+    ).catch(() => [])
+
+    setGameState({
+      ...finalState,
+      leaderboard,
+      submittedResult,
+    })
     setScreen("results")
   }
 
@@ -88,47 +216,54 @@ export default function ClassGoApp() {
     }
   }
 
+  if (isBootstrapping) {
+    return <main className="min-h-screen bg-background" />
+  }
+
   return (
     <main className="min-h-screen">
-      {screen === "landing" && (
-        <LandingPage onGetStarted={handleGetStarted} />
-      )}
-      
+      {screen === "landing" && <LandingPage onGetStarted={handleGetStarted} />}
+
       {screen === "login" && (
-        <LoginScreen 
-          onLogin={handleLogin} 
-          onBack={() => setScreen("landing")} 
+        <LoginScreen
+          onTeacherLogin={handleTeacherLogin}
+          onStudentLogin={handleStudentLogin}
+          onGoogleLogin={handleGoogleLogin}
+          onBack={() => setScreen("landing")}
         />
       )}
-      
+
       {screen === "teacher-dashboard" && currentUser && (
         <TeacherDashboardNew
           user={currentUser}
-          onLogout={handleLogout}
+          onLogout={() => {
+            void handleLogout()
+          }}
           onUserUpdate={handleUserUpdate}
         />
       )}
-      
+
       {screen === "student-dashboard" && currentUser && (
         <StudentDashboard
           user={currentUser}
-          onLogout={handleLogout}
+          onLogout={() => {
+            void handleLogout()
+          }}
           onUserUpdate={handleUserUpdate}
           onStartChallenge={handleStartChallenge}
         />
       )}
-      
-      {screen === "gameplay" && (
-        <GameplayScreen
-          gameState={gameState}
-          onGameComplete={handleGameComplete}
-        />
+
+      {screen === "gameplay" && gameState.topic && (
+        <GameplayScreen gameState={gameState} onGameComplete={handleGameComplete} />
       )}
-      
+
       {screen === "results" && (
         <ResultsScreen
           gameState={gameState}
+          currentUser={currentUser}
           onBackToHome={handleBackToHome}
+          onRetry={gameState.classroomId ? handleRetryChallenge : undefined}
         />
       )}
     </main>

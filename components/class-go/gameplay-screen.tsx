@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Headphones, RotateCcw, Volume2, XCircle, Zap } from "lucide-react"
+import { CheckCircle2, Headphones, Volume2, XCircle, Zap } from "lucide-react"
 import type {
   FillInBlankQuestion,
+  ListenAndSelectQuestion,
   MatchItemsQuestion,
   MultipleChoiceQuestion,
   SingleChoiceQuestion,
@@ -14,7 +15,6 @@ import type {
   TopicQuestionType,
 } from "@/lib/types"
 import type { GameState } from "@/app/page"
-import { getTopicById } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import confetti from "canvas-confetti"
 
@@ -79,7 +79,7 @@ const emptyDraft = (): AnswerDraft => ({
 })
 
 export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProps) {
-  const topic = gameState.topicId ? getTopicById(gameState.topicId) : undefined
+  const topic = gameState.topic
   const questions = topic?.questions?.length ? topic.questions : fallbackQuestions
 
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -87,13 +87,24 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   const [showFeedback, setShowFeedback] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [feedbackText, setFeedbackText] = useState("")
+  const [draggedMatchOption, setDraggedMatchOption] = useState<string | null>(null)
+  const [activeDropZone, setActiveDropZone] = useState<string | null>(null)
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null)
   const [localGameState, setLocalGameState] = useState(gameState)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const applauseAudioRef = useRef<HTMLAudioElement | null>(null)
+  const matchBoardRef = useRef<HTMLDivElement | null>(null)
+  const matchOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const matchTargetRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const question = questions[currentQuestion]
   const progress = ((currentQuestion + 1) / questions.length) * 100
   const fillOptions = useMemo(
     () => (question.type === "fill_in_blank" ? createFillOptions(question) : {}),
+    [question]
+  )
+  const shuffledMatchOptions = useMemo(
+    () => (question.type === "match_items" ? shuffleArray(question.pairs.map((pair) => pair.right)) : []),
     [question]
   )
 
@@ -152,46 +163,61 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   }
 
   const playCompletionApplause = () => {
-    if (typeof window === "undefined") return
+    const playSynthApplause = () => {
+      if (typeof window === "undefined") return
 
-    const AudioContextClass = window.AudioContext || (window as typeof window & {
-      webkitAudioContext?: typeof AudioContext
-    }).webkitAudioContext
+      const AudioContextClass = window.AudioContext || (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext
+      }).webkitAudioContext
 
-    if (!AudioContextClass) return
+      if (!AudioContextClass) return
 
-    const context = audioContextRef.current ?? new AudioContextClass()
-    audioContextRef.current = context
+      const context = audioContextRef.current ?? new AudioContextClass()
+      audioContextRef.current = context
 
-    if (context.state === "suspended") {
-      void context.resume()
-    }
-
-    const now = context.currentTime
-
-    for (let i = 0; i < 14; i += 1) {
-      const burstTime = now + i * 0.085
-      const buffer = context.createBuffer(1, context.sampleRate * 0.08, context.sampleRate)
-      const channelData = buffer.getChannelData(0)
-
-      for (let j = 0; j < channelData.length; j += 1) {
-        const fade = 1 - j / channelData.length
-        channelData[j] = (Math.random() * 2 - 1) * fade
+      if (context.state === "suspended") {
+        void context.resume()
       }
 
-      const source = context.createBufferSource()
-      source.buffer = buffer
-      const gainNode = context.createGain()
+      const now = context.currentTime
 
-      gainNode.gain.setValueAtTime(0.0001, burstTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.11, burstTime + 0.01)
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, burstTime + 0.08)
+      for (let i = 0; i < 14; i += 1) {
+        const burstTime = now + i * 0.085
+        const buffer = context.createBuffer(1, context.sampleRate * 0.08, context.sampleRate)
+        const channelData = buffer.getChannelData(0)
 
-      source.connect(gainNode)
-      gainNode.connect(context.destination)
-      source.start(burstTime)
-      source.stop(burstTime + 0.08)
+        for (let j = 0; j < channelData.length; j += 1) {
+          const fade = 1 - j / channelData.length
+          channelData[j] = (Math.random() * 2 - 1) * fade
+        }
+
+        const source = context.createBufferSource()
+        source.buffer = buffer
+        const gainNode = context.createGain()
+
+        gainNode.gain.setValueAtTime(0.0001, burstTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.11, burstTime + 0.01)
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, burstTime + 0.08)
+
+        source.connect(gainNode)
+        gainNode.connect(context.destination)
+        source.start(burstTime)
+        source.stop(burstTime + 0.08)
+      }
     }
+
+    if (typeof window !== "undefined") {
+      const applause = applauseAudioRef.current ?? new Audio("/audio/clapping.mp3")
+      applauseAudioRef.current = applause
+      applause.currentTime = 0
+      applause.volume = 0.6
+      void applause.play().catch(() => {
+        playSynthApplause()
+      })
+      return
+    }
+
+    playSynthApplause()
   }
 
   const speakPrompt = (text: string) => {
@@ -363,13 +389,70 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
       if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         void audioContextRef.current.close()
       }
+      if (applauseAudioRef.current) {
+        applauseAudioRef.current.pause()
+        applauseAudioRef.current.currentTime = 0
+      }
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel()
       }
     }
   }, [])
 
-  const renderChoiceQuestion = (current: MultipleChoiceQuestion | SingleChoiceQuestion) => (
+  useEffect(() => {
+    if (!draggedMatchOption) return
+
+    const updateDropZone = (clientX: number, clientY: number) => {
+      const targetElement = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-match-target-id]")
+      setActiveDropZone(targetElement?.dataset.matchTargetId || null)
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const board = matchBoardRef.current
+      if (!board) return
+
+      const rect = board.getBoundingClientRect()
+      setDragPoint({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      })
+      updateDropZone(event.clientX, event.clientY)
+    }
+
+    const handlePointerUp = () => {
+      if (draggedMatchOption && activeDropZone) {
+        setDraft((currentDraft) => {
+          const nextAnswers = { ...currentDraft.matchAnswers }
+
+          Object.entries(nextAnswers).forEach(([currentPairId, currentOption]) => {
+            if (currentOption === draggedMatchOption) {
+              delete nextAnswers[currentPairId]
+            }
+          })
+
+          nextAnswers[activeDropZone] = draggedMatchOption
+
+          return { ...currentDraft, matchAnswers: nextAnswers }
+        })
+      }
+
+      setDraggedMatchOption(null)
+      setActiveDropZone(null)
+      setDragPoint(null)
+    }
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerup", handlePointerUp)
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+    }
+  }, [activeDropZone, draggedMatchOption])
+
+  const renderChoiceQuestion = (
+    current: MultipleChoiceQuestion | SingleChoiceQuestion | ListenAndSelectQuestion
+  ) => (
     <div className="space-y-3">
       {current.options.map((option) => {
         const isSelected = draft.choiceIds.includes(option.id)
@@ -462,7 +545,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     )
   }
 
-  const renderListenAndSelect = (current: SingleChoiceQuestion & { audioText: string }) => (
+  const renderListenAndSelect = (current: ListenAndSelectQuestion) => (
     <div className="space-y-4">
       <div className="rounded-2xl bg-primary/5 p-4 text-center">
         <Button
@@ -481,39 +564,141 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   )
 
   const renderMatchItems = (current: MatchItemsQuestion) => {
-    const rightOptions = current.pairs.map((pair) => pair.right)
+    const rightOptions = shuffledMatchOptions
+    const assignedOptions = Object.values(draft.matchAnswers)
+    const getRelativePoint = (element: HTMLElement | null) => {
+      const board = matchBoardRef.current
+      if (!board || !element) return null
+
+      const boardRect = board.getBoundingClientRect()
+      const elementRect = element.getBoundingClientRect()
+
+      return {
+        left: elementRect.left - boardRect.left,
+        right: elementRect.right - boardRect.left,
+        y: elementRect.top - boardRect.top + elementRect.height / 2,
+      }
+    }
+
+    const committedLines = current.pairs
+      .map((pair) => {
+        const option = draft.matchAnswers[pair.id]
+        if (!option) return null
+
+        const from = getRelativePoint(matchOptionRefs.current[option])
+        const to = getRelativePoint(matchTargetRefs.current[pair.id])
+
+        if (!from || !to) return null
+        return { id: pair.id, from, to }
+      })
+      .filter((line): line is NonNullable<typeof line> => Boolean(line))
+
+    const previewStart = draggedMatchOption ? getRelativePoint(matchOptionRefs.current[draggedMatchOption]) : null
+    const previewEnd =
+      activeDropZone && draggedMatchOption
+        ? getRelativePoint(matchTargetRefs.current[activeDropZone])
+        : dragPoint
 
     return (
-      <div className="space-y-4">
-        <p className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">{current.instruction}</p>
-        {current.pairs.map((pair) => (
-          <div key={pair.id} className="rounded-2xl border border-border p-4">
-            <p className="mb-3 font-semibold text-foreground">{pair.left}</p>
-            <div className="flex flex-wrap gap-2">
-              {rightOptions.map((option) => {
-                const isSelected = draft.matchAnswers[pair.id] === option
+      <div ref={matchBoardRef} className="relative space-y-4">
+        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+          {committedLines.map((line) => (
+            <line
+              key={line.id}
+              x1={line.from.right}
+              y1={line.from.y}
+              x2={line.to.left}
+              y2={line.to.y}
+              stroke="#6366F1"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+          ))}
+          {previewStart && previewEnd && (
+            <line
+              x1={previewStart.right}
+              y1={previewStart.y}
+              x2={"left" in previewEnd ? previewEnd.left : previewEnd.x}
+              y2={previewEnd.y}
+              stroke="#EC4899"
+              strokeWidth="4"
+              strokeDasharray="10 8"
+              strokeLinecap="round"
+            />
+          )}
+        </svg>
 
-                return (
-                  <Button
-                    key={`${pair.id}-${option}`}
-                    variant="ghost"
-                    onClick={() => setDraft((currentDraft) => ({
-                      ...currentDraft,
-                      matchAnswers: { ...currentDraft.matchAnswers, [pair.id]: option },
-                    }))}
+        <p className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">{current.instruction}</p>
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:gap-4">
+          <div className="space-y-3">
+            <p className="text-center text-sm font-medium text-muted-foreground">Words</p>
+            {rightOptions.map((option) => {
+              const isUsed = assignedOptions.includes(option)
+
+              return (
+                <div
+                  key={option}
+                  className={cn(
+                    "mx-auto w-full max-w-[180px] rounded-xl border shadow-sm transition-all sm:max-w-[220px]",
+                    isUsed ? "border-primary/20 bg-primary/5" : "border-border bg-background"
+                  )}
+                >
+                  <button
+                    type="button"
+                    ref={(element) => {
+                      matchOptionRefs.current[option] = element
+                    }}
+                    onPointerDown={(event) => {
+                      if (showFeedback) return
+
+                      const board = matchBoardRef.current
+                      if (!board) return
+
+                      const rect = board.getBoundingClientRect()
+                      setDraggedMatchOption(option)
+                      setDragPoint({
+                        x: event.clientX - rect.left,
+                        y: event.clientY - rect.top,
+                      })
+                    }}
                     disabled={showFeedback}
                     className={cn(
-                      "rounded-xl",
-                      isSelected ? "bg-primary text-primary-foreground hover:bg-primary" : "bg-secondary hover:bg-secondary/80"
+                      "flex min-h-12 w-full touch-none items-center justify-center rounded-xl px-3 py-2 text-center text-sm font-medium transition-all sm:px-4",
+                      isUsed
+                        ? "bg-primary/10 text-primary"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                      draggedMatchOption === option && "scale-105 bg-pink-100 text-pink-700 shadow-lg"
                     )}
                   >
                     {option}
-                  </Button>
-                )
-              })}
-            </div>
+                  </button>
+                </div>
+              )
+            })}
           </div>
-        ))}
+
+          <div className="space-y-3">
+            <p className="text-center text-sm font-medium text-muted-foreground">Respuestas</p>
+            {current.pairs.map((pair) => (
+              <div key={pair.id} className="mx-auto w-full max-w-[180px] rounded-xl border border-border bg-background shadow-sm sm:max-w-[220px]">
+                <div
+                  ref={(element) => {
+                    matchTargetRefs.current[pair.id] = element
+                  }}
+                  data-match-target-id={pair.id}
+                  className={cn(
+                    "flex min-h-12 w-full items-center justify-center rounded-xl px-3 py-2 text-center text-sm font-medium transition-all sm:px-4",
+                    activeDropZone === pair.id
+                      ? "bg-pink-100 text-pink-700"
+                      : "bg-secondary text-secondary-foreground"
+                  )}
+                >
+                  <span>{pair.left}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -533,7 +718,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
               </div>
             </div>
             <span className="text-sm font-medium text-muted-foreground">
-              Pregunta {currentQuestion + 1} de {questions.length}
+              Question {currentQuestion + 1} of {questions.length}
             </span>
           </div>
           <Progress value={progress} className="h-3" />
@@ -551,8 +736,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
             {question.type === "single_choice" && renderChoiceQuestion(question)}
             {question.type === "multiple_choice" && renderChoiceQuestion(question)}
             {question.type === "fill_in_blank" && renderFillInBlank(question)}
-            {question.type === "listen_and_select" &&
-              renderListenAndSelect(question as SingleChoiceQuestion & { audioText: string })}
+            {question.type === "listen_and_select" && renderListenAndSelect(question as ListenAndSelectQuestion)}
             {question.type === "match_items" && renderMatchItems(question)}
 
             {(question.type === "multiple_choice" || question.type === "fill_in_blank" || question.type === "match_items") && (

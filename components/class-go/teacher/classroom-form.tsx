@@ -30,9 +30,9 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
     e.preventDefault()
     const newErrors: Record<string, string> = {}
 
-    if (!name.trim()) newErrors.name = "El nombre es requerido"
-    if (!code.trim()) newErrors.code = "El codigo es requerido"
-    if (code.length < 4) newErrors.code = "El codigo debe tener al menos 4 caracteres"
+    if (!name.trim()) newErrors.name = "Name is required"
+    if (!code.trim()) newErrors.code = "Code is required"
+    if (code.length < 4) newErrors.code = "Code must be at least 4 characters"
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -59,7 +59,7 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
       >
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-foreground">
-            {classroom ? "Editar Aula" : "Nueva Aula"}
+            {classroom ? "Edit Classroom" : "New Classroom"}
           </h2>
           <button
             onClick={onClose}
@@ -73,13 +73,13 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
           {/* Name */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Nombre del Aula
+              Classroom Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Matematicas 3A"
+              placeholder="Ex: Math 3A"
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
@@ -88,14 +88,14 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
           {/* Code */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Codigo de Acceso
+              Access Code
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="Ej: MAT3A"
+                placeholder="Ex: MAT3A"
                 maxLength={10}
                 className="flex-1 rounded-xl border border-border bg-background px-4 py-3 font-mono text-foreground uppercase placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
@@ -109,19 +109,19 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
             </div>
             {errors.code && <p className="mt-1 text-sm text-destructive">{errors.code}</p>}
             <p className="mt-1 text-xs text-muted-foreground">
-              Los estudiantes usaran este codigo para unirse
+              Students will use this code to join
             </p>
           </div>
 
           {/* Description */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Descripcion (opcional)
+              Description (optional)
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe tu aula..."
+              placeholder="Describe your classroom..."
               rows={3}
               className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
@@ -134,13 +134,13 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
               onClick={onClose}
               className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              {classroom ? "Guardar" : "Crear Aula"}
+              {classroom ? "Save" : "Create Classroom"}
             </button>
           </div>
         </form>

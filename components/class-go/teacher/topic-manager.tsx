@@ -14,9 +14,9 @@ interface TopicManagerProps {
 }
 
 const difficultyLabels = {
-  easy: { label: "Facil", color: "bg-green-100 text-green-700" },
-  medium: { label: "Medio", color: "bg-yellow-100 text-yellow-700" },
-  hard: { label: "Dificil", color: "bg-red-100 text-red-700" },
+  easy: { label: "Easy", color: "bg-green-100 text-green-700" },
+  medium: { label: "Medium", color: "bg-yellow-100 text-yellow-700" },
+  hard: { label: "Hard", color: "bg-red-100 text-red-700" },
 }
 
 export function TopicManager({
@@ -40,8 +40,8 @@ export function TopicManager({
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Mis Topicos</h2>
-            <p className="text-muted-foreground">Crea topicos para tus planes</p>
+            <h2 className="text-2xl font-bold text-foreground">My Topics</h2>
+            <p className="text-muted-foreground">Create topics for your plans</p>
           </div>
         </div>
         <motion.button
@@ -54,7 +54,7 @@ export function TopicManager({
           className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
         >
           <Plus className="h-5 w-5" />
-          Nuevo Topico
+          New Topic
         </motion.button>
       </div>
 
@@ -68,15 +68,15 @@ export function TopicManager({
           <div className="mb-4 rounded-full bg-primary/10 p-4">
             <BookOpen className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-foreground">No tienes topicos aun</h3>
+          <h3 className="mb-2 text-lg font-semibold text-foreground">You don't have any topics yet</h3>
           <p className="mb-6 text-center text-muted-foreground">
-            Crea topicos para agregar a tus planes
+            Create topics to add to your plans
           </p>
           <button
             onClick={onCreateTopic}
             className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
           >
-            Crear Topico
+            Create Topic
           </button>
         </motion.div>
       ) : (
@@ -114,7 +114,7 @@ export function TopicManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted"
                       >
                         <Edit3 className="h-4 w-4" />
-                        Editar
+                        Edit
                       </button>
                       <hr className="my-2 border-border" />
                       <button
@@ -125,7 +125,7 @@ export function TopicManager({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
-                        Eliminar
+                        Delete
                       </button>
                     </motion.div>
                   )}
@@ -152,7 +152,7 @@ export function TopicManager({
                   {difficultyLabels[topic.difficulty].label}
                 </span>
                 <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                  {topic.questions.length} preguntas
+                  {topic.questions.length} questions
                 </span>
               </div>
             </motion.div>
