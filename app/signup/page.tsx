@@ -41,7 +41,7 @@ export default function SignupPage() {
       setError(
         submissionError instanceof Error
           ? submissionError.message
-          : "No se pudo crear la cuenta."
+          : "Could not create the account."
       )
     } finally {
       setIsSubmitting(false)

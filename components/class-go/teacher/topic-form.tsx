@@ -269,7 +269,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                         {q.type === "listen_and_select" && (
                           <>
                             <textarea value={q.audioText} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, audioText: e.target.value }))} rows={3} placeholder="Text to read aloud" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
-                            <p className="text-sm text-muted-foreground">Selecciona una sola respuesta correcta para lo que el alumno escuchará.</p>
+                            <p className="text-sm text-muted-foreground">Select a single correct answer for what the student will hear.</p>
                           </>
                         )}
                         <div className="space-y-2">
@@ -346,3 +346,4 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
     </motion.div>
   )
 }
+

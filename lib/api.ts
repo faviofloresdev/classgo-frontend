@@ -16,6 +16,8 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8081"
 const SESSION_STORAGE_KEY = "classgo.session"
+export const NETWORK_ACTIVITY_EVENT = "classgo:network-activity"
+let pendingRequestCount = 0
 
 type BackendRole = "TEACHER" | "STUDENT" | "PARENT"
 type BackendActivationMode = "MANUAL" | "AUTO"
@@ -211,6 +213,16 @@ export interface SessionData {
 
 function isBrowser() {
   return typeof window !== "undefined"
+}
+
+function notifyNetworkActivity() {
+  if (!isBrowser()) return
+
+  window.dispatchEvent(
+    new CustomEvent(NETWORK_ACTIVITY_EVENT, {
+      detail: { pendingCount: pendingRequestCount },
+    })
+  )
 }
 
 function toRole(role: BackendRole): User["role"] {
@@ -434,45 +446,61 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Authorization", `Bearer ${session.accessToken}`)
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  })
+  try {
+    pendingRequestCount += 1
+    notifyNetworkActivity()
 
-  if (!response.ok) {
-    let message = "No se pudo completar la solicitud."
-    try {
-      const contentType = response.headers.get("content-type") || ""
-      if (contentType.includes("application/json")) {
-        const payload = (await response.json()) as {
-          error?: {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    })
+
+    if (!response.ok) {
+      let message = "Could not complete the request."
+      try {
+        const contentType = response.headers.get("content-type") || ""
+        if (contentType.includes("application/json")) {
+          const payload = (await response.json()) as {
+            error?: {
+              message?: string
+            }
             message?: string
           }
-          message?: string
+          message = payload.error?.message || payload.message || message
+        } else {
+          const text = await response.text()
+          if (text) {
+            message = text
+          }
         }
-        message = payload.error?.message || payload.message || message
-      } else {
-        const text = await response.text()
-        if (text) {
-          message = text
-        }
+      } catch {
+        // Ignore text parsing failures.
       }
-    } catch {
-      // Ignore text parsing failures.
+      throw new Error(normalizeApiErrorMessage(message))
     }
-    throw new Error(normalizeApiErrorMessage(message))
-  }
 
-  if (response.status === 204) {
-    return undefined as T
-  }
+    if (response.status === 204) {
+      return undefined as T
+    }
 
-  const contentType = response.headers.get("content-type") || ""
-  if (!contentType.includes("application/json")) {
-    return undefined as T
-  }
+    const contentType = response.headers.get("content-type") || ""
+    if (!contentType.includes("application/json")) {
+      return undefined as T
+    }
 
-  return (await response.json()) as T
+    return (await response.json()) as T
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        `Could not connect to the backend at ${API_BASE_URL}. Check that the server is running and that CORS allows this frontend origin.`
+      )
+    }
+
+    throw error
+  } finally {
+    pendingRequestCount = Math.max(0, pendingRequestCount - 1)
+    notifyNetworkActivity()
+  }
 }
 
 export function getStoredSession() {

@@ -361,14 +361,14 @@ export function StudentClassroomView({
                           {entry.student.name}
                           {isMe && (
                             <span className="ml-2 rounded-full bg-indigo-500 px-2 py-0.5 text-xs text-white">
-                              Tu
+                              You
                             </span>
                           )}
                         </p>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-indigo-600">{entry.totalScore}</div>
-                        <div className="text-xs text-gray-500">puntos</div>
+                        <div className="text-xs text-gray-500">points</div>
                       </div>
                     </motion.div>
                   )

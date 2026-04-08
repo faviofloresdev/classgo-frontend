@@ -27,7 +27,7 @@ const fallbackQuestions: SingleChoiceQuestion[] = [
   {
     id: "fallback-q1",
     type: "single_choice",
-    prompt: "Cuanto es 3 + 4?",
+    prompt: "What is 3 + 4?",
     options: [
       { id: "a", text: "6", isCorrect: false },
       { id: "b", text: "7", isCorrect: true },
@@ -45,15 +45,15 @@ function shuffleArray<T>(items: T[]): T[] {
 function getQuestionTypeLabel(type: TopicQuestionType): string {
   switch (type) {
     case "multiple_choice":
-      return "Seleccion multiple"
+      return "Multiple choice"
     case "single_choice":
-      return "Seleccion unica"
+      return "Single choice"
     case "fill_in_blank":
-      return "Completar palabra"
+      return "Fill in the blank"
     case "listen_and_select":
-      return "Escuchar y seleccionar"
+      return "Listen and select"
     case "match_items":
-      return "Relacionar items"
+      return "Match items"
   }
 }
 
@@ -514,7 +514,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         <div className="space-y-4">
           {current.hiddenIndexes.map((index) => (
             <div key={index} className="rounded-2xl bg-muted/50 p-4">
-              <p className="mb-3 text-sm font-semibold text-muted-foreground">Elige la letra para el espacio {index + 1}</p>
+              <p className="mb-3 text-sm font-semibold text-muted-foreground">Choose the letter for blank {index + 1}</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {fillOptions[index]?.map((letter) => {
                   const isSelected = draft.fillAnswers[index] === letter
@@ -555,7 +555,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           className="rounded-xl"
         >
           <Volume2 className="mr-2 h-4 w-4" />
-          Escuchar
+          Listen
         </Button>
         <p className="mt-3 text-sm text-muted-foreground">{current.audioText}</p>
       </div>
@@ -678,7 +678,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           </div>
 
           <div className="space-y-3">
-            <p className="text-center text-sm font-medium text-muted-foreground">Respuestas</p>
+            <p className="text-center text-sm font-medium text-muted-foreground">Answers</p>
             {current.pairs.map((pair) => (
               <div key={pair.id} className="mx-auto w-full max-w-[180px] rounded-xl border border-border bg-background shadow-sm sm:max-w-[220px]">
                 <div
@@ -728,7 +728,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           <CardContent className="p-6 sm:p-8">
             <div className="mb-8 text-center">
               <p className="mb-2 text-sm font-medium text-muted-foreground">
-                {topic?.name || "Reto activo"}
+                {topic?.name || "Active challenge"}
               </p>
               <h2 className="text-2xl font-bold text-foreground sm:text-4xl">{question.prompt}</h2>
             </div>
@@ -746,7 +746,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                   disabled={!isAnswerReady || showFeedback}
                   className="min-w-52 rounded-xl px-6 py-6 text-base font-bold"
                 >
-                  Revisar respuesta
+                  Check answer
                 </Button>
               </div>
             )}
@@ -761,7 +761,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                   <>
                     <CheckCircle2 className="mt-0.5 size-8 text-green-500" />
                     <div>
-                      <p className="font-bold text-green-700">Correcto</p>
+                      <p className="font-bold text-green-700">Correct</p>
                       <p className="text-sm text-green-700">{feedbackText}</p>
                     </div>
                   </>
@@ -769,8 +769,8 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                   <>
                     <XCircle className="mt-0.5 size-8 text-red-500" />
                     <div>
-                      <p className="font-bold text-red-700">Intentalo otra vez la proxima</p>
-                      <p className="text-sm text-red-700">Respuesta correcta: {feedbackText}</p>
+                      <p className="font-bold text-red-700">Try again next time</p>
+                      <p className="text-sm text-red-700">Correct answer: {feedbackText}</p>
                     </div>
                   </>
                 )}

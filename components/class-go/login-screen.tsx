@@ -36,6 +36,7 @@ export function LoginScreen({
   const selectedRoleRef = useRef<"teacher" | "student" | null>(null)
   const onGoogleLoginRef = useRef(onGoogleLogin)
   const hasInitializedGoogleRef = useRef(false)
+  const lastRenderedGoogleWidthRef = useRef<number | null>(null)
 
   useEffect(() => {
     selectedRoleRef.current = selectedRole
@@ -52,6 +53,7 @@ export function LoginScreen({
 
     let isCancelled = false
     let resizeObserver: ResizeObserver | null = null
+    let resizeFrameId: number | null = null
 
     const handleGoogleError = () => {
       if (isCancelled) return
@@ -68,9 +70,15 @@ export function LoginScreen({
         return
       }
 
-      googleButtonRef.current.innerHTML = ""
       const availableWidth = Math.floor(googleButtonRef.current.getBoundingClientRect().width || 360)
       const buttonWidth = Math.max(180, Math.min(availableWidth, 360))
+      if (lastRenderedGoogleWidthRef.current === buttonWidth) {
+        setIsGoogleLoading(false)
+        return
+      }
+
+      lastRenderedGoogleWidthRef.current = buttonWidth
+      googleButtonRef.current.innerHTML = ""
       const buttonSize = buttonWidth < 240 ? "medium" : "large"
       const googleMountNode = document.createElement("div")
       googleMountNode.className = "google-signin-inner"
@@ -128,13 +136,22 @@ export function LoginScreen({
       renderGoogleButton()
       if (typeof ResizeObserver !== "undefined" && googleButtonRef.current) {
         resizeObserver = new ResizeObserver(() => {
-          renderGoogleButton()
+          if (resizeFrameId !== null) {
+            window.cancelAnimationFrame(resizeFrameId)
+          }
+
+          resizeFrameId = window.requestAnimationFrame(() => {
+            renderGoogleButton()
+          })
         })
         resizeObserver.observe(googleButtonRef.current)
       }
 
       return () => {
         isCancelled = true
+        if (resizeFrameId !== null) {
+          window.cancelAnimationFrame(resizeFrameId)
+        }
         resizeObserver?.disconnect()
       }
     }
@@ -146,6 +163,9 @@ export function LoginScreen({
 
       return () => {
         isCancelled = true
+        if (resizeFrameId !== null) {
+          window.cancelAnimationFrame(resizeFrameId)
+        }
         resizeObserver?.disconnect()
         existingScript.removeEventListener("load", renderGoogleButton)
         existingScript.removeEventListener("error", handleGoogleError)
@@ -163,6 +183,9 @@ export function LoginScreen({
 
     return () => {
       isCancelled = true
+      if (resizeFrameId !== null) {
+        window.cancelAnimationFrame(resizeFrameId)
+      }
       resizeObserver?.disconnect()
       script.removeEventListener("load", renderGoogleButton)
       script.removeEventListener("error", handleGoogleError)

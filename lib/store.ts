@@ -73,8 +73,8 @@ export const topics: Topic[] = [
       {
         id: 'topic-1-q1',
         type: 'single_choice',
-        prompt: 'Cuanto es 3 + 4?',
-        explanation: 'Sumamos 3 y 4 para obtener 7.',
+        prompt: 'What is 3 + 4?',
+        explanation: 'We add 3 and 4 to get 7.',
         options: [
           { id: 'a', text: '6', isCorrect: false },
           { id: 'b', text: '7', isCorrect: true },
@@ -106,8 +106,8 @@ export const topics: Topic[] = [
   },
   {
     id: 'topic-3',
-    name: 'Multiplicaciones',
-    description: 'Tablas de multiplicar del 1 al 5',
+    name: 'Multiplication',
+    description: 'Multiplication tables from 1 to 5',
     icon: 'X',
     color: '#8B5CF6',
     difficulty: 'medium',
@@ -115,7 +115,7 @@ export const topics: Topic[] = [
       {
         id: 'topic-3-q1',
         type: 'multiple_choice',
-        prompt: 'Selecciona todas las multiplicaciones que dan 12.',
+        prompt: 'Select all multiplication facts that equal 12.',
         options: [
           { id: 'a', text: '3 x 4', isCorrect: true },
           { id: 'b', text: '2 x 6', isCorrect: true },
@@ -129,8 +129,8 @@ export const topics: Topic[] = [
   },
   {
     id: 'topic-4',
-    name: 'Divisiones',
-    description: 'Division basica con numeros pequenos',
+    name: 'Division',
+    description: 'Basic division with small numbers',
     icon: 'Divide',
     color: '#F59E0B',
     difficulty: 'medium',
@@ -138,8 +138,8 @@ export const topics: Topic[] = [
       {
         id: 'topic-4-q1',
         type: 'listen_and_select',
-        prompt: 'Escucha y selecciona la respuesta correcta.',
-        audioText: 'Seis dividido entre dos',
+        prompt: 'Listen and select the correct answer.',
+        audioText: 'Six divided by two',
         options: [
           { id: 'a', text: '2', isCorrect: false },
           { id: 'b', text: '3', isCorrect: true },
@@ -152,8 +152,8 @@ export const topics: Topic[] = [
   },
   {
     id: 'topic-5',
-    name: 'Fracciones',
-    description: 'Introduccion a las fracciones',
+    name: 'Fractions',
+    description: 'Introduction to fractions',
     icon: 'PieChart',
     color: '#EF4444',
     difficulty: 'hard',
@@ -161,12 +161,12 @@ export const topics: Topic[] = [
       {
         id: 'topic-5-q1',
         type: 'match_items',
-        prompt: 'Relaciona cada enunciado con una palabra.',
-        instruction: 'Une cada enunciado corto con la palabra correcta.',
+        prompt: 'Match each clue with the correct word.',
+        instruction: 'Connect each short clue with the correct word.',
         pairs: [
-          { id: 'a', left: 'Tiene cuatro lados iguales', right: 'Cuadrado' },
-          { id: 'b', left: 'Color del cielo', right: 'Azul' },
-          { id: 'c', left: 'Animal que ladra', right: 'Perro' },
+          { id: 'a', left: 'Has four equal sides', right: 'Square' },
+          { id: 'b', left: 'Color of the sky', right: 'Blue' },
+          { id: 'c', left: 'Animal that barks', right: 'Dog' },
         ],
       },
     ],
@@ -179,8 +179,8 @@ export const topics: Topic[] = [
 export const plans: Plan[] = [
   {
     id: 'plan-1',
-    name: 'Matematicas Nivel 1',
-    description: 'Plan basico de matematicas para principiantes',
+    name: 'Math Level 1',
+    description: 'Basic math plan for beginners',
     teacherId: 'teacher-1',
     activationMode: 'manual',
     startDate: new Date('2024-02-01'),

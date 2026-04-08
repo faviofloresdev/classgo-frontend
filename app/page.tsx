@@ -7,7 +7,9 @@ import { TeacherDashboardNew } from "@/components/class-go/teacher/teacher-dashb
 import { StudentDashboard } from "@/components/class-go/student/student-dashboard"
 import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
+import { Spinner } from "@/components/ui/spinner"
 import {
+  NETWORK_ACTIVITY_EVENT,
   getClassroomLeaderboard,
   getCurrentUser,
   getGameplayContext,
@@ -82,6 +84,21 @@ export default function ClassGoApp() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const [pendingRequestCount, setPendingRequestCount] = useState(0)
+  const [showNetworkOverlay, setShowNetworkOverlay] = useState(false)
+
+  useEffect(() => {
+    const handleNetworkActivity = (event: Event) => {
+      const detail = (event as CustomEvent<{ pendingCount?: number }>).detail
+      setPendingRequestCount(detail?.pendingCount ?? 0)
+    }
+
+    window.addEventListener(NETWORK_ACTIVITY_EVENT, handleNetworkActivity)
+
+    return () => {
+      window.removeEventListener(NETWORK_ACTIVITY_EVENT, handleNetworkActivity)
+    }
+  }, [])
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -104,6 +121,21 @@ export default function ClassGoApp() {
 
     void restoreSession()
   }, [])
+
+  useEffect(() => {
+    if (pendingRequestCount <= 0) {
+      setShowNetworkOverlay(false)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowNetworkOverlay(true)
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [pendingRequestCount])
 
   const handleGetStarted = () => {
     setScreen("login")
@@ -262,6 +294,15 @@ export default function ClassGoApp() {
 
   return (
     <main className="min-h-screen">
+      {showNetworkOverlay && (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full border border-primary/10 bg-white/92 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur">
+            <Spinner className="size-4 text-primary" />
+            <span>Loading, please wait...</span>
+          </div>
+        </div>
+      )}
+
       {screen === "landing" && <LandingPage onGetStarted={handleGetStarted} />}
 
       {screen === "login" && (

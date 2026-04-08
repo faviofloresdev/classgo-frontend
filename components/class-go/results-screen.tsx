@@ -66,7 +66,10 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
     const applause = new Audio("/audio/clapping.mp3")
     applause.volume = 0.6
     applauseAudioRef.current = applause
-    void applause.play().catch(() => undefined)
+
+    const playTimeout = window.setTimeout(() => {
+      void applause.play().catch(() => undefined)
+    }, 180)
 
     const duration = 3000
     const animationEnd = Date.now() + duration
@@ -97,6 +100,7 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
     }, 250)
 
     return () => {
+      window.clearTimeout(playTimeout)
       clearInterval(interval)
       applause.pause()
       applause.currentTime = 0
