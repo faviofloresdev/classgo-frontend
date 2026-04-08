@@ -136,3 +136,17 @@
   opacity: 0;
   transform: translateY(6px) scale(0.996);
 }
+
+.google-signin-slot {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+  overflow: visible;
+}
+
+.google-signin-inner {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+}

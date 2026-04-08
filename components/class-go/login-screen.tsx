@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,45 +9,221 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, BookOpen, GraduationCap, Zap } from "lucide-react"
 import Link from "next/link"
 
-type UserRole = "teacher" | "student" | null
-
 interface LoginScreenProps {
-  onLogin: (role: UserRole) => void
+  onTeacherLogin: (email: string, password: string) => Promise<void>
+  onStudentLogin: (email: string, password: string) => Promise<void>
+  onGoogleLogin: (role: "teacher" | "student", idToken: string) => Promise<void>
   onBack: () => void
 }
 
-export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
-  const [selectedRole, setSelectedRole] = useState<UserRole>(null)
+const GOOGLE_SCRIPT_ID = "google-identity-services"
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ""
+const HAS_VALID_GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID.endsWith(".apps.googleusercontent.com")
+
+export function LoginScreen({
+  onTeacherLogin,
+  onStudentLogin,
+  onGoogleLogin,
+  onBack,
+}: LoginScreenProps) {
+  const [selectedRole, setSelectedRole] = useState<"teacher" | "student" | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [error, setError] = useState("")
+  const googleButtonRef = useRef<HTMLDivElement | null>(null)
+  const selectedRoleRef = useRef<"teacher" | "student" | null>(null)
+  const onGoogleLoginRef = useRef(onGoogleLogin)
+  const hasInitializedGoogleRef = useRef(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    selectedRoleRef.current = selectedRole
+  }, [selectedRole])
+
+  useEffect(() => {
+    onGoogleLoginRef.current = onGoogleLogin
+  }, [onGoogleLogin])
+
+  useEffect(() => {
+    if (!selectedRole || !HAS_VALID_GOOGLE_CLIENT_ID || !googleButtonRef.current) {
+      return
+    }
+
+    let isCancelled = false
+    let resizeObserver: ResizeObserver | null = null
+
+    const handleGoogleError = () => {
+      if (isCancelled) return
+      setIsGoogleLoading(false)
+      setError("Could not load Google Login.")
+    }
+
+    const renderGoogleButton = () => {
+      if (
+        isCancelled ||
+        !googleButtonRef.current ||
+        !window.google?.accounts?.id
+      ) {
+        return
+      }
+
+      googleButtonRef.current.innerHTML = ""
+      const availableWidth = Math.floor(googleButtonRef.current.getBoundingClientRect().width || 360)
+      const buttonWidth = Math.max(180, Math.min(availableWidth, 360))
+      const buttonSize = buttonWidth < 240 ? "medium" : "large"
+      const googleMountNode = document.createElement("div")
+      googleMountNode.className = "google-signin-inner"
+      googleMountNode.style.width = `${buttonWidth}px`
+      googleButtonRef.current.appendChild(googleMountNode)
+
+      if (!hasInitializedGoogleRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async ({ credential }) => {
+            const currentRole = selectedRoleRef.current
+
+            if (!credential) {
+              setError("Google did not return a valid token.")
+              return
+            }
+
+            if (!currentRole) {
+              setError("Choose a role before continuing with Google.")
+              return
+            }
+
+            setIsSubmitting(true)
+            setError("")
+
+            try {
+              await onGoogleLoginRef.current(currentRole, credential)
+            } catch (submissionError) {
+              setError(
+                submissionError instanceof Error
+                  ? submissionError.message
+                  : "Google sign-in failed."
+              )
+            } finally {
+              setIsSubmitting(false)
+            }
+          },
+        })
+        hasInitializedGoogleRef.current = true
+      }
+
+      window.google.accounts.id.renderButton(googleMountNode, {
+        theme: "outline",
+        size: buttonSize,
+        shape: "pill",
+        text: "continue_with",
+        width: buttonWidth,
+      })
+      setIsGoogleLoading(false)
+    }
+
+    setIsGoogleLoading(true)
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton()
+      if (typeof ResizeObserver !== "undefined" && googleButtonRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          renderGoogleButton()
+        })
+        resizeObserver.observe(googleButtonRef.current)
+      }
+
+      return () => {
+        isCancelled = true
+        resizeObserver?.disconnect()
+      }
+    }
+
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null
+    if (existingScript) {
+      existingScript.addEventListener("load", renderGoogleButton)
+      existingScript.addEventListener("error", handleGoogleError)
+
+      return () => {
+        isCancelled = true
+        resizeObserver?.disconnect()
+        existingScript.removeEventListener("load", renderGoogleButton)
+        existingScript.removeEventListener("error", handleGoogleError)
+      }
+    }
+
+    const script = document.createElement("script")
+    script.id = GOOGLE_SCRIPT_ID
+    script.src = "https://accounts.google.com/gsi/client"
+    script.async = true
+    script.defer = true
+    script.addEventListener("load", renderGoogleButton)
+    script.addEventListener("error", handleGoogleError)
+    document.head.appendChild(script)
+
+    return () => {
+      isCancelled = true
+      resizeObserver?.disconnect()
+      script.removeEventListener("load", renderGoogleButton)
+      script.removeEventListener("error", handleGoogleError)
+    }
+  }, [selectedRole])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin(selectedRole)
+    if (!selectedRole) return
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      if (selectedRole === "teacher") {
+        await onTeacherLogin(email, password)
+      } else {
+        await onStudentLogin(email, password)
+      }
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Sign-in failed."
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <div className="min-h-screen px-4 py-6">
       <div className="mx-auto max-w-md">
-        {/* Header */}
         <header className="mb-8 flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onBack}
-            className="shrink-0"
-          >
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ArrowLeft className="size-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Zap className="size-5" />
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+              <svg viewBox="0 0 180 180" className="h-full w-full" aria-hidden="true">
+                <defs>
+                  <linearGradient id="login-logo-bg" x1="24" y1="18" x2="156" y2="162" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#6366F1" />
+                    <stop offset="1" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+                <rect width="180" height="180" rx="40" fill="url(#login-logo-bg)" />
+                <path
+                  d="M118.557 51.5781C119.69 45.5391 112.931 41.0469 107.697 44.25L53.7422 77.2656C48.1172 80.6953 49.8398 89.2812 56.2891 90.2812L77.7188 93.5859C79.9219 93.9258 82.0703 92.9727 83.3359 91.1328L103.861 61.3594L88.1699 92.5312C86.8828 95.0898 87.7617 98.2148 90.1914 99.7109L101.42 106.625C104.757 108.68 109.103 106.728 109.804 102.875L118.557 51.5781Z"
+                  fill="white"
+                />
+                <path
+                  d="M74.6719 108.281L65.5 125.234C63.5156 128.906 68.0859 132.707 71.4453 129.758L89.1406 114.227C90.7266 112.836 90.3672 110.281 88.4375 109.375L79.9141 105.375C77.9688 104.461 75.707 106.367 74.6719 108.281Z"
+                  fill="#FDE68A"
+                />
+              </svg>
             </div>
             <span className="text-xl font-bold text-foreground">Class Go</span>
           </div>
         </header>
 
-        {/* Role Selection */}
         {!selectedRole ? (
           <div className="space-y-6">
             <div className="text-center">
@@ -56,41 +232,39 @@ export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
             </div>
 
             <div className="grid gap-4">
-              {/* Teacher Card */}
-              <Card 
+              <Card
                 className="cursor-pointer border-2 border-transparent transition-all hover:border-primary hover:shadow-lg"
                 onClick={() => setSelectedRole("teacher")}
               >
                 <CardContent className="flex items-center gap-4 p-6">
-                  <Avatar className="size-16 bg-gradient-to-br from-blue-400 to-blue-600">
-                    <AvatarFallback className="bg-transparent text-white">
+                  <Avatar className="flex size-16 shrink-0 items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600">
+                    <AvatarFallback className="flex h-full w-full items-center justify-center bg-transparent text-white">
                       <GraduationCap className="size-8" />
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-lg font-semibold">I&apos;m a Teacher</h3>
                     <p className="text-sm text-muted-foreground">
-                      Create classrooms and manage topics
+                      Access your classrooms, plans, and topics
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Student Card */}
-              <Card 
+              <Card
                 className="cursor-pointer border-2 border-transparent transition-all hover:border-primary hover:shadow-lg"
                 onClick={() => setSelectedRole("student")}
               >
                 <CardContent className="flex items-center gap-4 p-6">
-                  <Avatar className="size-16 bg-gradient-to-br from-pink-400 to-purple-500">
-                    <AvatarFallback className="bg-transparent text-white">
+                  <Avatar className="flex size-16 shrink-0 items-center justify-center bg-gradient-to-br from-pink-400 to-purple-500">
+                    <AvatarFallback className="flex h-full w-full items-center justify-center bg-transparent text-white">
                       <BookOpen className="size-8" />
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-lg font-semibold">I&apos;m a Student</h3>
                     <p className="text-sm text-muted-foreground">
-                      Join a classroom and play challenges
+                      Sign in, create an account, or continue with Google
                     </p>
                   </div>
                 </CardContent>
@@ -98,14 +272,15 @@ export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
             </div>
           </div>
         ) : (
-          /* Login Form */
           <div className="space-y-6">
             <div className="text-center">
-              <div className={`mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl ${
-                selectedRole === "teacher" 
-                  ? "bg-gradient-to-br from-blue-400 to-blue-600" 
-                  : "bg-gradient-to-br from-pink-400 to-purple-500"
-              }`}>
+              <div
+                className={`mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl ${
+                  selectedRole === "teacher"
+                    ? "bg-gradient-to-br from-blue-400 to-blue-600"
+                    : "bg-gradient-to-br from-pink-400 to-purple-500"
+                }`}
+              >
                 {selectedRole === "teacher" ? (
                   <GraduationCap className="size-8 text-white" />
                 ) : (
@@ -116,89 +291,106 @@ export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
                 {selectedRole === "teacher" ? "Teacher Login" : "Student Login"}
               </h1>
               <p className="mt-2 text-muted-foreground">
-                Enter your details to continue
+                {selectedRole === "teacher"
+                  ? "Sign in with your account"
+                  : "Sign in with your student account"}
               </p>
             </div>
 
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
-                <CardTitle className="text-base">Sign In</CardTitle>
+                <CardTitle className="text-base">
+                  Sign In
+                </CardTitle>
                 <CardDescription>
-                  {selectedRole === "teacher" 
-                    ? "Access your classroom dashboard" 
-                    : "Join your classroom"
-                  }
+                  {selectedRole === "teacher"
+                    ? "Access your teacher dashboard"
+                    : "Access your classrooms and challenges"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Google Sign In Button */}
-                  <Button 
-                    type="button"
-                    variant="outline" 
-                    className="h-12 w-full gap-3 rounded-xl font-medium"
-                    onClick={() => onLogin(selectedRole)}
+                  {HAS_VALID_GOOGLE_CLIENT_ID && (
+                    <>
+                      <div className="space-y-2">
+                        <div ref={googleButtonRef} className="google-signin-slot min-h-11 w-full max-w-full" />
+                        {isGoogleLoading && (
+                          <p className="text-center text-xs text-muted-foreground">
+                            Loading Google sign-in...
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-card px-2 text-muted-foreground">
+                            Or continue with email
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {!HAS_VALID_GOOGLE_CLIENT_ID && (
+                    <p className="text-sm text-muted-foreground">
+                      Google Login is disabled because `NEXT_PUBLIC_GOOGLE_CLIENT_ID` does not contain a valid web client ID.
+                    </p>
+                  )}
+
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-12"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="********"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="h-12"
+                      />
+                    </div>
+
+                    <div className="text-center text-sm">
+                      <Link
+                        href={`/signup?role=${selectedRole === "teacher" ? "teacher" : "student"}`}
+                        className="text-primary underline"
+                      >
+                        {selectedRole === "teacher"
+                          ? "Create a teacher account"
+                          : "Create a student account"}
+                      </Link>
+                    </div>
+                  </>
+
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+
+                  <Button
+                    type="submit"
+                    className="h-12 w-full rounded-xl font-semibold"
+                    disabled={isSubmitting || !email.trim() || !password.trim()}
                   >
-                    <svg className="size-5" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                    </svg>
-                    Continue with Google
-                  </Button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="h-12"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="********"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-12"
-                    />
-                  </div>
-                  <div className="text-center text-sm">
-                    <Link href="/signup" className="text-primary underline">Create an internal account</Link>
-                  </div>
-                  {/* Classroom code removed per request */}
-
-                  <Button type="submit" className="h-12 w-full rounded-xl font-semibold">
-                    Sign In with Email
+                    {isSubmitting ? (
+                      "Signing in..."
+                    ) : selectedRole === "teacher" ? (
+                      "Sign In with Email"
+                    ) : (
+                      "Sign In as Student"
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -207,7 +399,10 @@ export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
             <Button
               variant="ghost"
               className="w-full"
-              onClick={() => setSelectedRole(null)}
+              onClick={() => {
+                setSelectedRole(null)
+                setError("")
+              }}
             >
               <ArrowLeft className="mr-2 size-4" />
               Choose different role

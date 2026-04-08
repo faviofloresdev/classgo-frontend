@@ -1,36 +1,35 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Medal, Sparkles, Star, Target, TrendingUp, Trophy, Zap } from "lucide-react"
 import type { GameState } from "@/app/page"
+import type { User } from "@/lib/types"
 import confetti from "canvas-confetti"
 
 interface ResultsScreenProps {
   gameState: GameState
+  currentUser: User | null
   onBackToHome: () => void
+  onRetry?: () => void
 }
 
-const fullLeaderboard = [
-  { rank: 1, name: "Emma", points: 245, avatar: "E", color: "bg-pink-400", isYou: false },
-  { rank: 2, name: "You", points: 230, avatar: "A", color: "bg-gradient-to-br from-primary to-accent", isYou: true },
-  { rank: 3, name: "Lucas", points: 210, avatar: "L", color: "bg-blue-400", isYou: false },
-  { rank: 4, name: "Sofia", points: 185, avatar: "S", color: "bg-green-400", isYou: false },
-  { rank: 5, name: "Noah", points: 170, avatar: "N", color: "bg-orange-400", isYou: false },
-]
-
-export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
+export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }: ResultsScreenProps) {
+  const applauseAudioRef = useRef<HTMLAudioElement | null>(null)
   const safeTotalQuestions = Math.max(gameState.totalQuestions, 1)
   const accuracy = Math.round((gameState.correctAnswers / safeTotalQuestions) * 100)
-  const points = gameState.correctAnswers * 15 + Math.round(accuracy / 10) * 5
-  const rank = 2
+  const points = gameState.submittedResult?.score ?? accuracy
+  const leaderboard = gameState.leaderboard || []
+  const currentEntry = leaderboard.find((entry) => entry.student.id === currentUser?.id)
+  const rank = currentEntry?.rank ?? (leaderboard.length ? leaderboard.length : 1)
 
   const performanceLabel =
     accuracy >= 90 ? "Excellent" : accuracy >= 75 ? "Very good" : accuracy >= 60 ? "Good progress" : "Keep practicing"
-  const improvementArea = accuracy >= 80 ? "Try harder mixed tables next." : "Multiplication by 3 still needs practice."
+  const improvementArea =
+    accuracy >= 80 ? "Your progress looks strong. Keep working with mixed questions." : "It would help to review this week's exercises again."
 
   const stats = [
     {
@@ -64,6 +63,11 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
   ]
 
   useEffect(() => {
+    const applause = new Audio("/audio/clapping.mp3")
+    applause.volume = 0.6
+    applauseAudioRef.current = applause
+    void applause.play().catch(() => undefined)
+
     const duration = 3000
     const animationEnd = Date.now() + duration
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 }
@@ -71,7 +75,6 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
 
     const interval = setInterval(() => {
       const timeLeft = animationEnd - Date.now()
-
       if (timeLeft <= 0) {
         clearInterval(interval)
         return
@@ -93,7 +96,11 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
       })
     }, 250)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      applause.pause()
+      applause.currentTime = 0
+    }
   }, [])
 
   return (
@@ -109,22 +116,18 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
               <h1 className="truncate text-lg font-bold text-foreground sm:text-xl lg:text-2xl">Challenge Results</h1>
             </div>
           </div>
-          <Button onClick={onBackToHome} size="sm" className="h-10 shrink-0 rounded-xl px-4 sm:h-11 sm:px-5">
-            <ArrowLeft className="mr-2 size-4" />
-            Back
-          </Button>
         </header>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_360px] lg:gap-6">
           <div className="grid gap-4 lg:gap-6">
-            <Card className="overflow-hidden border-0 shadow-xl">
-              <CardContent className="bg-gradient-to-br from-primary via-primary to-accent p-4 text-primary-foreground sm:p-5 lg:p-7">
+            <Card className="gap-0 overflow-hidden border-0 bg-gradient-to-br from-primary via-primary to-accent py-0 shadow-xl">
+              <CardContent className="p-4 text-primary-foreground sm:p-5 lg:p-7">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <Badge className="mb-3 bg-white/15 text-white hover:bg-white/15">Challenge Complete</Badge>
                     <h2 className="text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">Great job this week!</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-white/85 sm:text-base">
-                      You answered {gameState.correctAnswers} of {safeTotalQuestions} correctly. {performanceLabel} work.
+                      You answered {gameState.correctAnswers} of {safeTotalQuestions} correctly and earned {points} points. {performanceLabel} work.
                     </p>
                   </div>
                   <div className="flex justify-start sm:justify-end">
@@ -150,6 +153,24 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
                     </div>
                   ))}
                 </div>
+
+                {onRetry && (
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                    <Button
+                      onClick={onRetry}
+                      className="h-12 rounded-xl bg-white text-base font-bold text-primary hover:bg-white/90"
+                    >
+                      Try again
+                    </Button>
+                    <Button
+                      onClick={onBackToHome}
+                      variant="outline"
+                      className="h-12 rounded-xl border-white/40 bg-white/10 text-base font-bold text-white hover:bg-white/15"
+                    >
+                      Back
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -172,7 +193,9 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
                           <p className="text-sm font-semibold text-green-800">Strength</p>
                           <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Strong</Badge>
                         </div>
-                        <p className="mt-2 text-sm leading-5 text-green-700">Multiplication by 2 is going very well.</p>
+                        <p className="mt-2 text-sm leading-5 text-green-700">
+                          {accuracy >= 80 ? "You completed the challenge with great accuracy." : "You are already solving part of this challenge correctly."}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -205,13 +228,15 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
                   <div className="rounded-2xl bg-muted/60 p-4">
                     <p className="text-sm font-semibold text-foreground">Keep the streak going</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Play one more round to improve your accuracy and earn more points.
+                      Return to your dashboard to review the ranking and wait for the next active challenge.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-primary/70">Class Position</p>
                     <p className="mt-2 text-3xl font-bold text-primary">#{rank}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">You are close to the top of the class.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {leaderboard.length ? "Your position already reflects the real classroom ranking." : "The ranking will appear once there are results."}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -226,59 +251,75 @@ export function ResultsScreen({ gameState, onBackToHome }: ResultsScreenProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {fullLeaderboard.map((player) => (
-                <div
-                  key={player.rank}
-                  className={`flex items-center gap-3 rounded-2xl p-3 sm:p-4 ${
-                    player.isYou
-                      ? "bg-gradient-to-r from-primary/10 to-accent/10 ring-2 ring-primary/20"
-                      : player.rank === 1
-                      ? "bg-gradient-to-r from-yellow-50 to-orange-50"
-                      : "bg-muted/50"
-                  }`}
-                >
-                  <div
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                      player.rank === 1
-                        ? "bg-gradient-to-br from-yellow-400 to-orange-400 text-white"
-                        : player.rank === 2
-                        ? "bg-gradient-to-br from-slate-300 to-slate-400 text-white"
-                        : player.rank === 3
-                        ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {player.rank}
-                  </div>
-                  <Avatar className={`size-10 shrink-0 ${player.color}`}>
-                    <AvatarFallback className={`${player.color} text-xs font-semibold text-white`}>
-                      {player.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className={`truncate text-sm font-medium sm:text-base ${player.isYou ? "text-primary" : "text-foreground"}`}>
-                      {player.name}
-                      {player.isYou && <span className="ml-1 text-xs text-muted-foreground">(You)</span>}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Rank #{player.rank} in class</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="flex items-center gap-1 font-semibold text-primary">
-                      <Star className="size-4 text-yellow-500" />
-                      {player.points}
-                    </div>
-                  </div>
+              {leaderboard.length === 0 ? (
+                <div className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
+                  There is no ranking data for this week yet.
                 </div>
-              ))}
+              ) : (
+                leaderboard.map((player) => {
+                  const isYou = player.student.id === currentUser?.id
+                  return (
+                    <div
+                      key={player.student.id}
+                      className={`flex items-center gap-3 rounded-2xl p-3 sm:p-4 ${
+                        isYou
+                          ? "bg-gradient-to-r from-primary/10 to-accent/10 ring-2 ring-primary/20"
+                          : player.rank === 1
+                          ? "bg-gradient-to-r from-yellow-50 to-orange-50"
+                          : "bg-muted/50"
+                      }`}
+                    >
+                      <div
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                          player.rank === 1
+                            ? "bg-gradient-to-br from-yellow-400 to-orange-400 text-white"
+                            : player.rank === 2
+                            ? "bg-gradient-to-br from-slate-300 to-slate-400 text-white"
+                            : player.rank === 3
+                            ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {player.rank}
+                      </div>
+                      <Avatar className="size-10 shrink-0 bg-gradient-to-br from-primary to-accent">
+                        <AvatarFallback className="text-xs font-semibold text-white">
+                          {player.student.name.slice(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-medium sm:text-base ${isYou ? "text-primary" : "text-foreground"}`}>
+                          {player.student.name}
+                          {isYou && <span className="ml-1 text-xs text-muted-foreground">(You)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Rank #{player.rank} in class</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="flex items-center gap-1 font-semibold text-primary">
+                          <Star className="size-4 text-yellow-500" />
+                          {player.totalScore}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </CardContent>
           </Card>
         </section>
 
         <div className="lg:hidden">
-          <Button onClick={onBackToHome} size="lg" className="h-12 w-full rounded-xl font-semibold">
-            <ArrowLeft className="mr-2 size-5" />
-            Back to Classroom
-          </Button>
+          <div className="space-y-3">
+            {onRetry && (
+              <Button onClick={onRetry} size="lg" className="h-12 w-full rounded-xl font-semibold">
+                Try again
+              </Button>
+            )}
+            <Button onClick={onBackToHome} size="lg" className="h-12 w-full rounded-xl font-semibold">
+              <ArrowLeft className="mr-2 size-5" />
+              Back to Classroom
+            </Button>
+          </div>
         </div>
       </div>
     </div>
