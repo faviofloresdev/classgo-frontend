@@ -194,7 +194,7 @@ export function ClassroomDetail({
                   className="flex items-center gap-4 rounded-xl border border-border bg-background p-4"
                 >
                   <img
-                    src={getAvatarUrl(student.avatarId)}
+                    src={getAvatarUrl(student.studentAvatarId || student.avatarId)}
                     alt={student.name}
                     className="h-12 w-12 rounded-full bg-muted"
                     crossOrigin="anonymous"

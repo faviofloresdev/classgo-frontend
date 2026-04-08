@@ -1,13 +1,16 @@
 // ClassGo Types
 
 export type UserRole = 'teacher' | 'student'
+export type AvatarId = string
 
 export interface User {
   id: string
   name: string
   email: string
   role: UserRole
-  avatarId: string
+  avatarId: AvatarId
+  studentAvatarId?: AvatarId | null
+  parentAvatarId?: AvatarId | null
   createdAt: Date
 }
 

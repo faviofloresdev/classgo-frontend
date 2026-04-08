@@ -228,7 +228,7 @@ export function StudentClassroomView({
                   >
                     <div className="relative mb-3">
                       <img
-                        src={getAvatarUrl(student.avatarId)}
+                        src={getAvatarUrl(student.studentAvatarId || student.avatarId)}
                         alt={student.name}
                         className="h-16 w-16 rounded-full border-4 border-white bg-white shadow-md"
                         crossOrigin="anonymous"

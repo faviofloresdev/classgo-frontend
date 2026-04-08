@@ -1,6 +1,7 @@
 "use client"
 
 import type {
+  AvatarId,
   Classroom,
   ClassroomWithDetails,
   LeaderboardEntry,
@@ -25,7 +26,9 @@ interface AuthUserResponse {
   name: string
   email: string
   role: BackendRole
-  avatarId?: string | null
+  avatarId?: AvatarId | null
+  studentAvatarId?: AvatarId | null
+  parentAvatarId?: AvatarId | null
 }
 
 interface LearningAuthResponse {
@@ -55,13 +58,15 @@ interface CoreAuthResponse {
 interface BackendBasicUser {
   id: string
   name: string
-  avatarId?: string | null
+  avatarId?: AvatarId | null
+  studentAvatarId?: AvatarId | null
+  parentAvatarId?: AvatarId | null
 }
 
 interface BackendTeacher {
   id: string
   name: string
-  avatarId?: string | null
+  avatarId?: AvatarId | null
 }
 
 interface BackendTopicSummary {
@@ -175,7 +180,7 @@ export interface StudentPresenceStreamEvent {
   classroomId: string
   studentId: string
   studentName: string
-  avatarId?: string | null
+  avatarId?: AvatarId | null
   message: string
   happenedAt: string
 }
@@ -188,7 +193,7 @@ export interface GameplayStreamSubscribedEvent {
 export interface PresenceSnapshotStudent {
   studentId: string
   studentName: string
-  avatarId?: string | null
+  avatarId?: AvatarId | null
   lastSeenAt: string
 }
 
@@ -228,23 +233,29 @@ function ensureQuestions(questions: unknown): TopicQuestion[] {
 }
 
 function mapBasicUser(user: BackendBasicUser, role: User["role"]): User {
+  const studentAvatarId = user.studentAvatarId ?? user.avatarId ?? "animal-1"
   return {
     id: user.id,
     name: user.name,
     email: "",
     role,
-    avatarId: user.avatarId || "animal-1",
+    avatarId: studentAvatarId,
+    studentAvatarId,
+    parentAvatarId: user.parentAvatarId ?? null,
     createdAt: new Date(),
   }
 }
 
 function mapUser(user: AuthUserResponse): User {
+  const studentAvatarId = user.studentAvatarId ?? user.avatarId ?? "animal-1"
   return {
     id: user.id,
     name: user.name,
     email: user.email || "",
     role: toRole(user.role),
-    avatarId: user.avatarId || "animal-1",
+    avatarId: studentAvatarId,
+    studentAvatarId,
+    parentAvatarId: user.parentAvatarId ?? null,
     createdAt: new Date(),
   }
 }
@@ -565,7 +576,12 @@ export async function logout() {
   }
 }
 
-export async function updateProfile(payload: { name?: string; avatarId?: string }) {
+export async function updateProfile(payload: {
+  name?: string
+  avatarId?: AvatarId
+  studentAvatarId?: AvatarId
+  parentAvatarId?: AvatarId
+}) {
   const response = await apiRequest<AuthUserResponse>("/api/users/me", {
     method: "PATCH",
     body: JSON.stringify(payload),

@@ -11,7 +11,9 @@ interface AvatarSelectorProps {
   currentAvatarId: string
   currentName?: string
   showNameField?: boolean
-  onSelect: (avatarId: string, name?: string) => void
+  title?: string
+  description?: string
+  onSelect: (avatarId: string, name?: string) => void | Promise<void>
   onClose: () => void
 }
 
@@ -19,18 +21,26 @@ export function AvatarSelector({
   currentAvatarId,
   currentName = "",
   showNameField = false,
+  title = "Choose Your Avatar",
+  description,
   onSelect,
   onClose,
 }: AvatarSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<Avatar["category"]>("animals")
   const [selectedId, setSelectedId] = useState(currentAvatarId)
   const [name, setName] = useState(currentName)
+  const [isSaving, setIsSaving] = useState(false)
 
   const filteredAvatars = avatars.filter((a) => a.category === selectedCategory)
 
-  const handleConfirm = () => {
-    onSelect(selectedId, name.trim())
-    onClose()
+  const handleConfirm = async () => {
+    setIsSaving(true)
+    try {
+      await onSelect(selectedId, name.trim())
+      onClose()
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -40,7 +50,7 @@ export function AvatarSelector({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
-        onClick={onClose}
+        onClick={isSaving ? undefined : onClose}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
@@ -50,7 +60,12 @@ export function AvatarSelector({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">Choose Your Avatar</h2>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">{title}</h2>
+              {description ? (
+                <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+              ) : null}
+            </div>
             <button
               onClick={onClose}
               className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted"
@@ -68,6 +83,7 @@ export function AvatarSelector({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your name"
                 className="h-12"
+                disabled={isSaving}
               />
             </div>
           )}
@@ -78,6 +94,7 @@ export function AvatarSelector({
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id as Avatar["category"])}
+                disabled={isSaving}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
                   selectedCategory === cat.id
                     ? "bg-primary text-primary-foreground shadow-md"
@@ -97,6 +114,7 @@ export function AvatarSelector({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedId(avatar.id)}
+                disabled={isSaving}
                 className={`relative aspect-square overflow-hidden rounded-xl border-3 transition-all ${
                   selectedId === avatar.id
                     ? "border-primary ring-2 ring-primary ring-offset-2"
@@ -126,16 +144,19 @@ export function AvatarSelector({
           <div className="flex gap-3">
             <button
               onClick={onClose}
+              disabled={isSaving}
               className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Cancel
             </button>
             <button
-              onClick={handleConfirm}
-              disabled={showNameField && !name.trim()}
+              onClick={() => {
+                void handleConfirm()
+              }}
+              disabled={isSaving || (showNameField && !name.trim())}
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Confirm
+              {isSaving ? "Saving..." : "Confirm"}
             </button>
           </div>
         </motion.div>

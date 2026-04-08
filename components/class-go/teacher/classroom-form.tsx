@@ -7,7 +7,7 @@ import type { Classroom } from "@/lib/types"
 
 interface ClassroomFormProps {
   classroom?: Classroom | null
-  onSave: (data: { name: string; code: string; description: string }) => void
+  onSave: (data: { name: string; code: string; description: string }) => void | Promise<void>
   onClose: () => void
 }
 
@@ -25,8 +25,9 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
   const [code, setCode] = useState(classroom?.code || generateCode())
   const [description, setDescription] = useState(classroom?.description || "")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const newErrors: Record<string, string> = {}
 
@@ -39,7 +40,18 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
       return
     }
 
-    onSave({ name, code, description })
+    setIsSaving(true)
+    try {
+      await onSave({ name: name.trim(), code: code.trim().toUpperCase(), description: description.trim() })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save the classroom."
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        code: message,
+      }))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -48,7 +60,7 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
-      onClick={onClose}
+      onClick={isSaving ? undefined : onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
@@ -78,8 +90,12 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                setErrors((currentErrors) => ({ ...currentErrors, name: "" }))
+              }}
               placeholder="Ex: Math 3A"
+              disabled={isSaving}
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
@@ -94,14 +110,19 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
               <input
                 type="text"
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setCode(e.target.value.toUpperCase())
+                  setErrors((currentErrors) => ({ ...currentErrors, code: "" }))
+                }}
                 placeholder="Ex: MAT3A"
                 maxLength={10}
+                disabled={isSaving}
                 className="flex-1 rounded-xl border border-border bg-background px-4 py-3 font-mono text-foreground uppercase placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="button"
                 onClick={() => setCode(generateCode())}
+                disabled={isSaving}
                 className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-muted-foreground transition-colors hover:bg-muted"
               >
                 <Sparkles className="h-4 w-4" />
@@ -123,6 +144,7 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your classroom..."
               rows={3}
+              disabled={isSaving}
               className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -132,15 +154,17 @@ export function ClassroomForm({ classroom, onSave, onClose }: ClassroomFormProps
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="flex-1 rounded-xl border border-border py-3 font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
+              disabled={isSaving}
               className="flex-1 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              {classroom ? "Save" : "Create Classroom"}
+              {isSaving ? "Saving..." : classroom ? "Save" : "Create Classroom"}
             </button>
           </div>
         </form>

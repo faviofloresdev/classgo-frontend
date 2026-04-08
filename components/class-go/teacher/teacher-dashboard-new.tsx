@@ -430,7 +430,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
           <ClassroomForm
             classroom={editingClassroom}
             onSave={(data) => {
-              void handleSaveClassroom(data)
+              return handleSaveClassroom(data)
             }}
             onClose={() => {
               setShowClassroomForm(false)

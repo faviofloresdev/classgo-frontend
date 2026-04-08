@@ -51,6 +51,7 @@ export function LoginScreen({
     }
 
     let isCancelled = false
+    let resizeObserver: ResizeObserver | null = null
 
     const handleGoogleError = () => {
       if (isCancelled) return
@@ -68,6 +69,14 @@ export function LoginScreen({
       }
 
       googleButtonRef.current.innerHTML = ""
+      const availableWidth = Math.floor(googleButtonRef.current.getBoundingClientRect().width || 360)
+      const buttonWidth = Math.max(180, Math.min(availableWidth, 360))
+      const buttonSize = buttonWidth < 240 ? "medium" : "large"
+      const googleMountNode = document.createElement("div")
+      googleMountNode.className = "google-signin-inner"
+      googleMountNode.style.width = `${buttonWidth}px`
+      googleButtonRef.current.appendChild(googleMountNode)
+
       if (!hasInitializedGoogleRef.current) {
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
@@ -103,12 +112,12 @@ export function LoginScreen({
         hasInitializedGoogleRef.current = true
       }
 
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
+      window.google.accounts.id.renderButton(googleMountNode, {
         theme: "outline",
-        size: "large",
+        size: buttonSize,
         shape: "pill",
         text: "continue_with",
-        width: 360,
+        width: buttonWidth,
       })
       setIsGoogleLoading(false)
     }
@@ -117,7 +126,17 @@ export function LoginScreen({
 
     if (window.google?.accounts?.id) {
       renderGoogleButton()
-      return
+      if (typeof ResizeObserver !== "undefined" && googleButtonRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          renderGoogleButton()
+        })
+        resizeObserver.observe(googleButtonRef.current)
+      }
+
+      return () => {
+        isCancelled = true
+        resizeObserver?.disconnect()
+      }
     }
 
     const existingScript = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null
@@ -127,6 +146,7 @@ export function LoginScreen({
 
       return () => {
         isCancelled = true
+        resizeObserver?.disconnect()
         existingScript.removeEventListener("load", renderGoogleButton)
         existingScript.removeEventListener("error", handleGoogleError)
       }
@@ -143,6 +163,7 @@ export function LoginScreen({
 
     return () => {
       isCancelled = true
+      resizeObserver?.disconnect()
       script.removeEventListener("load", renderGoogleButton)
       script.removeEventListener("error", handleGoogleError)
     }
@@ -180,8 +201,24 @@ export function LoginScreen({
             <ArrowLeft className="size-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Zap className="size-5" />
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+              <svg viewBox="0 0 180 180" className="h-full w-full" aria-hidden="true">
+                <defs>
+                  <linearGradient id="login-logo-bg" x1="24" y1="18" x2="156" y2="162" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#6366F1" />
+                    <stop offset="1" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+                <rect width="180" height="180" rx="40" fill="url(#login-logo-bg)" />
+                <path
+                  d="M118.557 51.5781C119.69 45.5391 112.931 41.0469 107.697 44.25L53.7422 77.2656C48.1172 80.6953 49.8398 89.2812 56.2891 90.2812L77.7188 93.5859C79.9219 93.9258 82.0703 92.9727 83.3359 91.1328L103.861 61.3594L88.1699 92.5312C86.8828 95.0898 87.7617 98.2148 90.1914 99.7109L101.42 106.625C104.757 108.68 109.103 106.728 109.804 102.875L118.557 51.5781Z"
+                  fill="white"
+                />
+                <path
+                  d="M74.6719 108.281L65.5 125.234C63.5156 128.906 68.0859 132.707 71.4453 129.758L89.1406 114.227C90.7266 112.836 90.3672 110.281 88.4375 109.375L79.9141 105.375C77.9688 104.461 75.707 106.367 74.6719 108.281Z"
+                  fill="#FDE68A"
+                />
+              </svg>
             </div>
             <span className="text-xl font-bold text-foreground">Class Go</span>
           </div>
@@ -200,8 +237,8 @@ export function LoginScreen({
                 onClick={() => setSelectedRole("teacher")}
               >
                 <CardContent className="flex items-center gap-4 p-6">
-                  <Avatar className="size-16 bg-gradient-to-br from-blue-400 to-blue-600">
-                    <AvatarFallback className="bg-transparent text-white">
+                  <Avatar className="flex size-16 shrink-0 items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600">
+                    <AvatarFallback className="flex h-full w-full items-center justify-center bg-transparent text-white">
                       <GraduationCap className="size-8" />
                     </AvatarFallback>
                   </Avatar>
@@ -219,8 +256,8 @@ export function LoginScreen({
                 onClick={() => setSelectedRole("student")}
               >
                 <CardContent className="flex items-center gap-4 p-6">
-                  <Avatar className="size-16 bg-gradient-to-br from-pink-400 to-purple-500">
-                    <AvatarFallback className="bg-transparent text-white">
+                  <Avatar className="flex size-16 shrink-0 items-center justify-center bg-gradient-to-br from-pink-400 to-purple-500">
+                    <AvatarFallback className="flex h-full w-full items-center justify-center bg-transparent text-white">
                       <BookOpen className="size-8" />
                     </AvatarFallback>
                   </Avatar>
@@ -276,7 +313,7 @@ export function LoginScreen({
                   {HAS_VALID_GOOGLE_CLIENT_ID && (
                     <>
                       <div className="space-y-2">
-                        <div ref={googleButtonRef} className="flex min-h-11 justify-center" />
+                        <div ref={googleButtonRef} className="google-signin-slot min-h-11 w-full max-w-full" />
                         {isGoogleLoading && (
                           <p className="text-center text-xs text-muted-foreground">
                             Loading Google sign-in...

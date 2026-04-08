@@ -16,6 +16,7 @@ import {
   Users,
   Sparkles,
   Plus,
+  Rocket,
 } from "lucide-react"
 import type { ClassroomWithDetails, StudentResultWithDetails, Topic, User } from "@/lib/types"
 import { getAvatarUrl } from "@/lib/avatars"
@@ -79,6 +80,7 @@ export function StudentDashboard({
   const [classrooms, setClassrooms] = useState<ClassroomWithDetails[]>([])
   const [results, setResults] = useState<StudentResultWithDetails[]>([])
   const [showAvatarSelector, setShowAvatarSelector] = useState(false)
+  const [showParentAvatarSelector, setShowParentAvatarSelector] = useState(false)
   const [selectedClassroom, setSelectedClassroom] = useState<ClassroomWithDetails | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [joinCode, setJoinCode] = useState("")
@@ -314,12 +316,19 @@ export function StudentDashboard({
 
   const handleAvatarChange = async (avatarId: string, name?: string) => {
     const updated = await updateProfile({
-      avatarId,
+      studentAvatarId: avatarId,
       name: name?.trim() ? name.trim() : user.name,
     })
     onUserUpdate(updated)
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
+  }
+
+  const handleParentAvatarChange = async (avatarId: string) => {
+    const updated = await updateProfile({
+      parentAvatarId: avatarId,
+    })
+    onUserUpdate(updated)
   }
 
   const handleJoinClassroom = async () => {
@@ -352,7 +361,7 @@ export function StudentDashboard({
         <div className="overflow-hidden rounded-3xl border border-indigo-100 bg-white/95 p-4 shadow-2xl backdrop-blur">
           <div className="flex items-start gap-3">
             <img
-              src={getAvatarUrl(presenceNotification.avatarId)}
+                  src={getAvatarUrl(presenceNotification.avatarId)}
               alt={presenceNotification.studentName}
               className="h-12 w-12 rounded-2xl border-2 border-white bg-white shadow-md"
               crossOrigin="anonymous"
@@ -436,30 +445,51 @@ export function StudentDashboard({
           <div className="flex items-center gap-3">
             <motion.div
               whileHover={{ scale: 1.1, rotate: 10 }}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-pink-500 text-xl font-black text-white shadow-lg"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-pink-500 text-white shadow-lg"
             >
-              CG
+              <Rocket className="h-6 w-6" />
             </motion.div>
             <span className="text-xl font-black text-indigo-900">ClassGo</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowAvatarSelector(true)} className="relative">
-              <motion.img
-                whileHover={{ scale: 1.1 }}
-                src={getAvatarUrl(user.avatarId)}
-                alt={user.name}
-                className="h-12 w-12 rounded-full border-3 border-white bg-white shadow-lg"
-                crossOrigin="anonymous"
-              />
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs"
+            <div className="relative flex items-end -space-x-3 pr-2">
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                onClick={() => setShowParentAvatarSelector(true)}
+                className="rounded-full"
+                aria-label="Change parent avatar"
+                title="Parent avatar"
               >
-                <Settings className="h-3 w-3 text-yellow-900" />
-              </motion.div>
-            </button>
+                <img
+                  src={getAvatarUrl(user.parentAvatarId || "parent-1")}
+                  alt="Parent avatar"
+                  className="h-10 w-10 rounded-full border-2 border-white bg-white object-cover shadow-sm"
+                  crossOrigin="anonymous"
+                />
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                onClick={() => setShowAvatarSelector(true)}
+                className="relative rounded-full"
+                aria-label="Change student avatar"
+                title="Student avatar"
+              >
+                <img
+                  src={getAvatarUrl(user.studentAvatarId || user.avatarId)}
+                  alt={user.name}
+                  className="h-12 w-12 rounded-full border-3 border-white bg-white shadow-lg"
+                  crossOrigin="anonymous"
+                />
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs"
+                >
+                  <Settings className="h-3 w-3 text-yellow-900" />
+                </motion.div>
+              </motion.button>
+            </div>
             <button
               onClick={onLogout}
               className="rounded-xl bg-red-100 p-3 text-red-600 transition-colors hover:bg-red-200"
@@ -713,13 +743,27 @@ export function StudentDashboard({
       <AnimatePresence>
         {showAvatarSelector && (
           <AvatarSelector
-            currentAvatarId={user.avatarId}
+            currentAvatarId={user.studentAvatarId || user.avatarId}
             currentName={user.name}
             showNameField
+            title="Student Avatar"
+            description="Choose the avatar that represents the student."
             onSelect={(avatarId, name) => {
-              void handleAvatarChange(avatarId, name)
+              return handleAvatarChange(avatarId, name)
             }}
             onClose={() => setShowAvatarSelector(false)}
+          />
+        )}
+
+        {showParentAvatarSelector && (
+          <AvatarSelector
+            currentAvatarId={user.parentAvatarId || "parent-1"}
+            title="Parent Avatar"
+            description="Choose the avatar that represents the parent."
+            onSelect={(avatarId) => {
+              return handleParentAvatarChange(avatarId)
+            }}
+            onClose={() => setShowParentAvatarSelector(false)}
           />
         )}
       </AnimatePresence>
