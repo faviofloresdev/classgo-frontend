@@ -127,8 +127,8 @@ export function StudentClassroomView({
                     <p className="mb-2 text-lg font-bold text-gray-900">Reto completado</p>
                     <div className="flex items-center gap-4">
                       <div className="text-center">
-                        <div className="text-3xl font-black text-indigo-600">{myCurrentWeekResult.score}%</div>
-                        <div className="text-sm text-gray-500">Puntuacion</div>
+                        <div className="text-3xl font-black text-indigo-600">{myCurrentWeekResult.score}</div>
+                        <div className="text-sm text-gray-500">Points</div>
                       </div>
                       <div className="h-12 w-px bg-gray-200" />
                       <div className="text-center">
@@ -390,14 +390,14 @@ export function StudentClassroomView({
                           </div>
                           <div
                             className={`rounded-full px-3 py-1 text-sm font-bold ${
-                              result.score >= 80
+                              result.score >= 140
                                 ? "bg-green-100 text-green-700"
-                                : result.score >= 60
+                                : result.score >= 90
                                 ? "bg-yellow-100 text-yellow-700"
                                 : "bg-red-100 text-red-700"
                             }`}
                           >
-                            {result.score}%
+                            {result.score} pts
                           </div>
                         </div>
                       ))}

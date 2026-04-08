@@ -127,7 +127,7 @@ export function ResultsScreen({ gameState, currentUser, onBackToHome, onRetry }:
                     <Badge className="mb-3 bg-white/15 text-white hover:bg-white/15">Challenge Complete</Badge>
                     <h2 className="text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">Great job this week!</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-white/85 sm:text-base">
-                      You answered {gameState.correctAnswers} of {safeTotalQuestions} correctly. {performanceLabel} work.
+                      You answered {gameState.correctAnswers} of {safeTotalQuestions} correctly and earned {points} points. {performanceLabel} work.
                     </p>
                   </div>
                   <div className="flex justify-start sm:justify-end">

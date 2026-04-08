@@ -417,8 +417,8 @@ export function StudentDashboard({
             },
             {
               icon: Star,
-              value: `${avgScore}%`,
-              label: "Average Score",
+              value: `${avgScore}`,
+              label: "Average Points",
               color: "from-blue-400 to-indigo-500",
               iconBg: "bg-blue-100",
               iconColor: "text-blue-600",
@@ -613,14 +613,14 @@ export function StudentDashboard({
                   </div>
                   <div
                     className={`rounded-full px-3 py-1 text-sm font-bold ${
-                      result.score >= 80
+                      result.score >= 140
                         ? "bg-green-100 text-green-700"
-                        : result.score >= 60
+                        : result.score >= 90
                         ? "bg-yellow-100 text-yellow-700"
                         : "bg-red-100 text-red-700"
                     }`}
                   >
-                    {result.score}%
+                    {result.score} pts
                   </div>
                 </motion.div>
               ))}

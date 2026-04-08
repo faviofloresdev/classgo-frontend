@@ -31,6 +31,7 @@ export interface GameState {
   currentQuestion: number
   totalQuestions: number
   correctAnswers: number
+  retryCount?: number
   answers: { question: string; correct: boolean; selected: string }[]
   classroomId?: string
   topicId?: string
@@ -45,9 +46,35 @@ const initialGameState: GameState = {
   currentQuestion: 0,
   totalQuestions: 0,
   correctAnswers: 0,
+  retryCount: 0,
   answers: [],
   leaderboard: [],
   submittedResult: null,
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function calculateChallengeScore(params: {
+  correctAnswers: number
+  totalQuestions: number
+  timeSpent: number
+  retryCount: number
+}) {
+  const safeTotalQuestions = Math.max(params.totalQuestions, 1)
+  const accuracyRatio = params.correctAnswers / safeTotalQuestions
+  const averageSecondsPerQuestion = params.timeSpent / safeTotalQuestions
+
+  const accuracyPoints = accuracyRatio * 100
+  const speedRatio = clamp((50 - averageSecondsPerQuestion) / 40, 0, 1)
+  const speedPoints = speedRatio * 40
+  const perseverancePoints = Math.min(params.correctAnswers * 4, 20)
+  const retryBonusPoints = Math.min(params.retryCount * 15, 30)
+
+  return Math.round(
+    clamp(accuracyPoints + speedPoints + perseverancePoints + retryBonusPoints, 0, 190)
+  )
 }
 
 export default function ClassGoApp() {
@@ -123,7 +150,7 @@ export default function ClassGoApp() {
     setCurrentUser(updatedUser)
   }
 
-  const handleStartChallenge = async (classroomId: string) => {
+  const handleStartChallenge = async (classroomId: string, retryCount = 0) => {
     const context = await getGameplayContext(classroomId)
 
     if (!context.topic) {
@@ -135,6 +162,7 @@ export default function ClassGoApp() {
         currentQuestion: context.existingResult.totalQuestions || 0,
         totalQuestions: context.existingResult.totalQuestions || 0,
         correctAnswers: context.existingResult.correctAnswers || 0,
+        retryCount,
         answers: Array.isArray(context.existingResult.answers)
           ? (context.existingResult.answers as GameState["answers"])
           : [],
@@ -153,6 +181,7 @@ export default function ClassGoApp() {
       currentQuestion: 0,
       totalQuestions: context.topic.questions.length,
       correctAnswers: 0,
+      retryCount,
       answers: [],
       classroomId,
       topicId: context.topic.id,
@@ -167,7 +196,7 @@ export default function ClassGoApp() {
 
   const handleRetryChallenge = async () => {
     if (!gameState.classroomId) return
-    await handleStartChallenge(gameState.classroomId)
+    await handleStartChallenge(gameState.classroomId, (gameState.retryCount || 0) + 1)
   }
 
   const handleGameComplete = async (finalState: GameState) => {
@@ -181,8 +210,12 @@ export default function ClassGoApp() {
       1,
       finalState.startedAt ? Math.round((Date.now() - finalState.startedAt) / 1000) : 1
     )
-    const safeTotalQuestions = Math.max(finalState.totalQuestions, 1)
-    const score = Math.round((finalState.correctAnswers / safeTotalQuestions) * 100)
+    const score = calculateChallengeScore({
+      correctAnswers: finalState.correctAnswers,
+      totalQuestions: finalState.totalQuestions,
+      timeSpent,
+      retryCount: finalState.retryCount || 0,
+    })
 
     const submittedResult = await submitResult({
       classroomId: finalState.classroomId,
