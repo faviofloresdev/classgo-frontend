@@ -651,7 +651,6 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         setFeedbackText("")
         setSelectedPhraseSwapId(null)
       } else {
-        playCompletionApplause()
         onGameComplete({
           ...localGameState,
           currentQuestion: currentQuestion + 1,
