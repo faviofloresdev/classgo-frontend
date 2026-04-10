@@ -47,11 +47,20 @@ export type TopicQuestionType =
   | 'single_choice'
   | 'fill_in_blank'
   | 'listen_and_select'
+  | 'listen_and_select_text'
+  | 'listen_and_select_image'
+  | 'image_selection'
+  | 'image_multiple_selection'
+  | 'single_text_ordering'
+  | 'phrase_ordering'
+  | 'text_ordering'
+  | 'image_ordering'
   | 'match_items'
 
 export interface TopicChoiceOption {
   id: string
   text: string
+  imageUrl?: string
   isCorrect: boolean
 }
 
@@ -61,10 +70,17 @@ export interface TopicMatchPair {
   right: string
 }
 
+export interface TopicOrderingItem {
+  id: string
+  text: string
+  imageUrl?: string
+}
+
 interface TopicQuestionBase {
   id: string
   type: TopicQuestionType
   prompt: string
+  imageUrl?: string
   explanation?: string
 }
 
@@ -90,6 +106,48 @@ export interface ListenAndSelectQuestion extends TopicQuestionBase {
   options: TopicChoiceOption[]
 }
 
+export interface ListenAndSelectTextQuestion extends TopicQuestionBase {
+  type: 'listen_and_select_text'
+  audioText: string
+  options: TopicChoiceOption[]
+}
+
+export interface ListenAndSelectImageQuestion extends TopicQuestionBase {
+  type: 'listen_and_select_image'
+  audioText: string
+  options: TopicChoiceOption[]
+}
+
+export interface ImageSelectionQuestion extends TopicQuestionBase {
+  type: 'image_selection'
+  options: TopicChoiceOption[]
+}
+
+export interface ImageMultipleSelectionQuestion extends TopicQuestionBase {
+  type: 'image_multiple_selection'
+  options: TopicChoiceOption[]
+}
+
+export interface SingleTextOrderingQuestion extends TopicQuestionBase {
+  type: 'single_text_ordering'
+  items: TopicOrderingItem[]
+}
+
+export interface PhraseOrderingQuestion extends TopicQuestionBase {
+  type: 'phrase_ordering'
+  items: TopicOrderingItem[]
+}
+
+export interface TextOrderingQuestion extends TopicQuestionBase {
+  type: 'text_ordering'
+  items: TopicOrderingItem[]
+}
+
+export interface ImageOrderingQuestion extends TopicQuestionBase {
+  type: 'image_ordering'
+  items: TopicOrderingItem[]
+}
+
 export interface MatchItemsQuestion extends TopicQuestionBase {
   type: 'match_items'
   instruction: string
@@ -101,6 +159,14 @@ export type TopicQuestion =
   | SingleChoiceQuestion
   | FillInBlankQuestion
   | ListenAndSelectQuestion
+  | ListenAndSelectTextQuestion
+  | ListenAndSelectImageQuestion
+  | ImageSelectionQuestion
+  | ImageMultipleSelectionQuestion
+  | SingleTextOrderingQuestion
+  | PhraseOrderingQuestion
+  | TextOrderingQuestion
+  | ImageOrderingQuestion
   | MatchItemsQuestion
 
 export interface Topic {
