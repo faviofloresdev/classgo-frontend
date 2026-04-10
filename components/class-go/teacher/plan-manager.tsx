@@ -127,7 +127,7 @@ export function PlanManager({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+              className="rounded-2xl border border-border bg-card shadow-sm"
             >
               {/* Plan Header */}
               <div

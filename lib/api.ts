@@ -432,6 +432,10 @@ function normalizeApiErrorMessage(message: string) {
     return "Your session is invalid or has expired."
   }
 
+  if (normalized === "forbidden") {
+    return "You are not allowed to perform this action."
+  }
+
   return message
 }
 
@@ -476,6 +480,14 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
         }
       } catch {
         // Ignore text parsing failures.
+      }
+
+      if (response.status === 403 && message === "Could not complete the request.") {
+        if (path.includes("/results")) {
+          message = "You are not allowed to submit results for this classroom."
+        } else {
+          message = "You are not allowed to perform this action."
+        }
       }
       throw new Error(normalizeApiErrorMessage(message))
     }

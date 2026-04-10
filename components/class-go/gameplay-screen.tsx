@@ -1,16 +1,25 @@
 "use client"
 
+import { Reorder, useDragControls } from "framer-motion"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Headphones, Volume2, XCircle, Zap } from "lucide-react"
+import { CheckCircle2, GripVertical, Headphones, Volume2, XCircle, Zap } from "lucide-react"
 import type {
   FillInBlankQuestion,
+  ImageMultipleSelectionQuestion,
+  ImageOrderingQuestion,
+  ImageSelectionQuestion,
   ListenAndSelectQuestion,
+  ListenAndSelectImageQuestion,
+  ListenAndSelectTextQuestion,
   MatchItemsQuestion,
   MultipleChoiceQuestion,
+  PhraseOrderingQuestion,
+  SingleTextOrderingQuestion,
   SingleChoiceQuestion,
+  TextOrderingQuestion,
   TopicQuestion,
   TopicQuestionType,
 } from "@/lib/types"
@@ -45,13 +54,29 @@ function shuffleArray<T>(items: T[]): T[] {
 function getQuestionTypeLabel(type: TopicQuestionType): string {
   switch (type) {
     case "multiple_choice":
-      return "Multiple choice"
+      return "Text multiple choice"
     case "single_choice":
-      return "Single choice"
+      return "Text single choice"
     case "fill_in_blank":
       return "Fill in the blank"
     case "listen_and_select":
       return "Listen and select"
+    case "listen_and_select_text":
+      return "Listen and select text"
+    case "listen_and_select_image":
+      return "Listen and select image"
+    case "image_selection":
+      return "Image single selection"
+    case "image_multiple_selection":
+      return "Image multiple selection"
+    case "single_text_ordering":
+      return "Single text ordering"
+    case "phrase_ordering":
+      return "Phrase ordering"
+    case "text_ordering":
+      return "Phrase ordering"
+    case "image_ordering":
+      return "Image ordering"
     case "match_items":
       return "Match items"
   }
@@ -70,13 +95,112 @@ type AnswerDraft = {
   choiceIds: string[]
   fillAnswers: Record<number, string>
   matchAnswers: Record<string, string>
+  orderingIds: string[]
 }
 
 const emptyDraft = (): AnswerDraft => ({
   choiceIds: [],
   fillAnswers: {},
   matchAnswers: {},
+  orderingIds: [],
 })
+
+function getSingleTextOrderingMetrics(itemCount: number) {
+  const safeCount = Math.max(itemCount, 1)
+  const gap = safeCount > 8 ? 6 : 8
+  const availableWidth = 280
+  const tileSize = Math.max(18, Math.min(64, Math.floor((availableWidth - gap * (safeCount - 1)) / safeCount)))
+  const fontSize = Math.max(12, Math.min(32, Math.floor(tileSize * 0.5)))
+
+  return { gap, tileSize, fontSize }
+}
+
+function getFillInBlankMetrics(itemCount: number) {
+  const safeCount = Math.max(itemCount, 1)
+  const gap = safeCount > 8 ? 4 : 6
+  const availableWidth = 300
+  const tileWidth = Math.max(20, Math.min(48, Math.floor((availableWidth - gap * (safeCount - 1)) / safeCount)))
+  const tileHeight = Math.max(28, Math.min(56, tileWidth + 8))
+  const fontSize = Math.max(12, Math.min(24, Math.floor(tileWidth * 0.5)))
+
+  return { gap, tileWidth, tileHeight, fontSize }
+}
+
+type TextOrderingTileProps = {
+  index: number
+  itemId: string
+  label: string
+  isLetterOrdering: boolean
+  isPhraseOrdering: boolean
+  disabled: boolean
+}
+
+function TextOrderingTile({ index, itemId, label, isLetterOrdering, isPhraseOrdering, disabled }: TextOrderingTileProps) {
+  const dragControls = useDragControls()
+
+  return (
+    <Reorder.Item
+      value={itemId}
+      dragListener={false}
+      dragControls={dragControls}
+      dragConstraints={isLetterOrdering ? { left: 0, right: 0 } : { top: 0, bottom: 0 }}
+      className={cn(
+        "rounded-2xl border border-border bg-background shadow-sm",
+        isLetterOrdering
+          ? "relative flex h-24 w-24 shrink-0 touch-pan-x items-center justify-center p-3"
+          : isPhraseOrdering
+            ? "flex w-full touch-pan-y items-center gap-3 rounded-2xl border-b-4 border-b-border/80 px-4 py-3"
+            : "flex touch-pan-y items-center gap-3 p-4",
+        disabled && "pointer-events-none"
+      )}
+    >
+      {isLetterOrdering ? (
+        <>
+          <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+            {index + 1}
+          </div>
+          <div className="flex items-center justify-center text-center text-3xl font-black uppercase leading-none text-foreground">
+            {label || "?"}
+          </div>
+        </>
+      ) : isPhraseOrdering ? (
+        <>
+          <div className="flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-bold text-primary">
+            {index + 1}
+          </div>
+          <div className="flex-1 text-left text-sm font-bold leading-none text-foreground">
+            {label || "Word"}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+            {index + 1}
+          </div>
+          <div className="flex-1 text-base font-semibold text-foreground">
+            {label || "Item"}
+          </div>
+        </>
+      )}
+      <button
+        type="button"
+        onPointerDown={(event) => {
+          if (disabled) return
+          dragControls.start(event)
+        }}
+        disabled={disabled}
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground",
+          isLetterOrdering && "absolute bottom-2 right-2 h-8 w-8 rounded-lg",
+          isPhraseOrdering && "h-8 w-8 rounded-full border-none bg-transparent text-muted-foreground/80"
+        )}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className={cn("h-5 w-5", isPhraseOrdering && "h-4 w-4")} />
+      </button>
+    </Reorder.Item>
+  )
+}
 
 export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProps) {
   const topic = gameState.topic
@@ -87,6 +211,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   const [showFeedback, setShowFeedback] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [feedbackText, setFeedbackText] = useState("")
+  const [selectedPhraseSwapId, setSelectedPhraseSwapId] = useState<string | null>(null)
   const [draggedMatchOption, setDraggedMatchOption] = useState<string | null>(null)
   const [activeDropZone, setActiveDropZone] = useState<string | null>(null)
   const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null)
@@ -107,13 +232,27 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     () =>
       question.type === "single_choice" ||
       question.type === "multiple_choice" ||
-      question.type === "listen_and_select"
+      question.type === "listen_and_select" ||
+      question.type === "listen_and_select_text" ||
+      question.type === "listen_and_select_image" ||
+      question.type === "image_selection" ||
+      question.type === "image_multiple_selection"
         ? shuffleArray(question.options)
         : [],
     [question]
   )
   const shuffledMatchOptions = useMemo(
     () => (question.type === "match_items" ? shuffleArray(question.pairs.map((pair) => pair.right)) : []),
+    [question]
+  )
+  const shuffledOrderingItems = useMemo(
+    () =>
+      question.type === "single_text_ordering" ||
+      question.type === "phrase_ordering" ||
+      question.type === "text_ordering" ||
+      question.type === "image_ordering"
+        ? shuffleArray(question.items)
+        : [],
     [question]
   )
 
@@ -239,11 +378,14 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   }
 
   const getCorrectSummary = (current: TopicQuestion): string => {
-    if (current.type === "single_choice" || current.type === "listen_and_select") {
-      return current.options.find((option) => option.isCorrect)?.text || ""
+    if (current.type === "single_choice" || current.type === "listen_and_select" || current.type === "listen_and_select_text" || current.type === "listen_and_select_image" || current.type === "image_selection") {
+      return current.options.find((option) => option.isCorrect)?.text || "Correct image"
     }
-    if (current.type === "multiple_choice") {
+    if (current.type === "multiple_choice" || current.type === "image_multiple_selection") {
       return current.options.filter((option) => option.isCorrect).map((option) => option.text).join(", ")
+    }
+    if (current.type === "single_text_ordering" || current.type === "phrase_ordering" || current.type === "text_ordering" || current.type === "image_ordering") {
+      return current.items.map((item) => item.text || "Item").join(" -> ")
     }
     if (current.type === "fill_in_blank") {
       return current.word
@@ -252,21 +394,21 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   }
 
   const evaluateCurrentAnswer = (): { correct: boolean; selectedSummary: string } => {
-    if (question.type === "single_choice" || question.type === "listen_and_select") {
+    if (question.type === "single_choice" || question.type === "listen_and_select" || question.type === "listen_and_select_text" || question.type === "listen_and_select_image" || question.type === "image_selection") {
       const selectedId = draft.choiceIds[0]
       const selectedOption = question.options.find((option) => option.id === selectedId)
       return {
         correct: Boolean(selectedOption?.isCorrect),
-        selectedSummary: selectedOption?.text || "",
+        selectedSummary: selectedOption?.text || "Image option",
       }
     }
 
-    if (question.type === "multiple_choice") {
+    if (question.type === "multiple_choice" || question.type === "image_multiple_selection") {
       const selected = new Set(draft.choiceIds)
       const correctIds = new Set(question.options.filter((option) => option.isCorrect).map((option) => option.id))
       const selectedSummary = question.options
         .filter((option) => selected.has(option.id))
-        .map((option) => option.text)
+        .map((option) => option.text || "Image option")
         .join(", ")
 
       return {
@@ -285,6 +427,20 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         (index) => (draft.fillAnswers[index] || "").toUpperCase() === question.word[index]?.toUpperCase()
       )
       return { correct, selectedSummary }
+    }
+
+    if (question.type === "single_text_ordering" || question.type === "phrase_ordering" || question.type === "text_ordering" || question.type === "image_ordering") {
+      const correctOrder = question.items.map((item) => item.id)
+      const selectedSummary = draft.orderingIds
+        .map((itemId) => question.items.find((item) => item.id === itemId)?.text || "Item")
+        .join(question.type === "single_text_ordering" ? "" : " -> ")
+
+      return {
+        correct:
+          draft.orderingIds.length === correctOrder.length &&
+          draft.orderingIds.every((itemId, index) => itemId === correctOrder[index]),
+        selectedSummary,
+      }
     }
 
     const selectedSummary = question.pairs
@@ -322,8 +478,8 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   const handleChoiceClick = (choiceId: string) => {
     if (showFeedback) return
 
-    if (question.type === "single_choice" || question.type === "listen_and_select") {
-      setDraft({ choiceIds: [choiceId], fillAnswers: {}, matchAnswers: {} })
+    if (question.type === "single_choice" || question.type === "listen_and_select" || question.type === "listen_and_select_text" || question.type === "listen_and_select_image" || question.type === "image_selection") {
+      setDraft({ choiceIds: [choiceId], fillAnswers: {}, matchAnswers: {}, orderingIds: [] })
       setTimeout(() => {
         setDraft((currentDraft) => ({ ...currentDraft, choiceIds: [choiceId] }))
         const selectedOption = question.options.find((option) => option.id === choiceId)
@@ -344,7 +500,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           setLocalGameState((prev) => ({
             ...prev,
             correctAnswers: correct ? prev.correctAnswers + 1 : prev.correctAnswers,
-            answers: [...prev.answers, { question: question.prompt, correct, selected: selectedOption.text }],
+            answers: [...prev.answers, { question: question.prompt, correct, selected: selectedOption.text || "Image option" }],
           }))
         }
       }, 0)
@@ -362,14 +518,127 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     })
   }
 
+  const addImageOrderingItem = (itemId: string) => {
+    if (showFeedback || question.type !== "image_ordering") return
+
+    setDraft((currentDraft) => {
+      if (currentDraft.orderingIds.includes(itemId) || currentDraft.orderingIds.length >= question.items.length) {
+        return currentDraft
+      }
+
+      return { ...currentDraft, orderingIds: [...currentDraft.orderingIds, itemId] }
+    })
+  }
+
+  const removeImageOrderingItem = (slotIndex: number) => {
+    if (showFeedback || question.type !== "image_ordering") return
+
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      orderingIds: currentDraft.orderingIds.filter((_, index) => index !== slotIndex),
+    }))
+  }
+
+  const addSingleTextOrderingItem = (itemId: string) => {
+    if (showFeedback || question.type !== "single_text_ordering") return
+
+    setDraft((currentDraft) => {
+      if (currentDraft.orderingIds.includes(itemId) || currentDraft.orderingIds.length >= question.items.length) {
+        return currentDraft
+      }
+
+      return { ...currentDraft, orderingIds: [...currentDraft.orderingIds, itemId] }
+    })
+  }
+
+  const removeSingleTextOrderingItem = (slotIndex: number) => {
+    if (showFeedback || question.type !== "single_text_ordering") return
+
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      orderingIds: currentDraft.orderingIds.filter((_, index) => index !== slotIndex),
+    }))
+  }
+
+  const handlePhraseSwapClick = (itemId: string) => {
+    if (showFeedback || (question.type !== "phrase_ordering" && question.type !== "text_ordering")) return
+
+    if (!selectedPhraseSwapId) {
+      setSelectedPhraseSwapId(itemId)
+      return
+    }
+
+    if (selectedPhraseSwapId === itemId) {
+      setSelectedPhraseSwapId(null)
+      return
+    }
+
+    setDraft((currentDraft) => {
+      const nextOrderingIds = [...currentDraft.orderingIds]
+      const firstIndex = nextOrderingIds.indexOf(selectedPhraseSwapId)
+      const secondIndex = nextOrderingIds.indexOf(itemId)
+
+      if (firstIndex === -1 || secondIndex === -1) {
+        return currentDraft
+      }
+
+      ;[nextOrderingIds[firstIndex], nextOrderingIds[secondIndex]] = [nextOrderingIds[secondIndex], nextOrderingIds[firstIndex]]
+
+      return { ...currentDraft, orderingIds: nextOrderingIds }
+    })
+
+    setSelectedPhraseSwapId(null)
+  }
+
+  const moveOrderingItem = (fromIndex: number, toIndex: number) => {
+    if (showFeedback || toIndex < 0 || toIndex >= draft.orderingIds.length) return
+
+    setDraft((currentDraft) => {
+      const nextOrderingIds = [...currentDraft.orderingIds]
+      const [movedItem] = nextOrderingIds.splice(fromIndex, 1)
+      if (!movedItem) return currentDraft
+      nextOrderingIds.splice(toIndex, 0, movedItem)
+      return { ...currentDraft, orderingIds: nextOrderingIds }
+    })
+  }
+
   const isAnswerReady =
-    question.type === "multiple_choice"
+    question.type === "multiple_choice" || question.type === "image_multiple_selection"
       ? draft.choiceIds.length > 0
+      : question.type === "single_text_ordering" || question.type === "phrase_ordering" || question.type === "text_ordering" || question.type === "image_ordering"
+        ? draft.orderingIds.length === question.items.length
       : question.type === "fill_in_blank"
         ? question.hiddenIndexes.every((index) => draft.fillAnswers[index])
         : question.type === "match_items"
           ? question.pairs.every((pair) => draft.matchAnswers[pair.id])
           : draft.choiceIds.length > 0
+
+  useEffect(() => {
+    if (question.type === "image_ordering" || question.type === "single_text_ordering") {
+      setDraft({
+        choiceIds: [],
+        fillAnswers: {},
+        matchAnswers: {},
+        orderingIds: [],
+      })
+      setSelectedPhraseSwapId(null)
+      return
+    }
+
+    if (question.type === "phrase_ordering" || question.type === "text_ordering") {
+      setDraft({
+        choiceIds: [],
+        fillAnswers: {},
+        matchAnswers: {},
+        orderingIds: shuffledOrderingItems.map((item) => item.id),
+      })
+      setSelectedPhraseSwapId(null)
+      return
+    }
+
+    setDraft(emptyDraft())
+    setSelectedPhraseSwapId(null)
+  }, [question, shuffledOrderingItems])
 
   useEffect(() => {
     if (!showFeedback) return
@@ -380,6 +649,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         setDraft(emptyDraft())
         setShowFeedback(false)
         setFeedbackText("")
+        setSelectedPhraseSwapId(null)
       } else {
         playCompletionApplause()
         onGameComplete({
@@ -460,28 +730,28 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   }, [activeDropZone, draggedMatchOption])
 
   const renderChoiceQuestion = (
-    current: MultipleChoiceQuestion | SingleChoiceQuestion | ListenAndSelectQuestion
+    current: MultipleChoiceQuestion | SingleChoiceQuestion | ListenAndSelectQuestion | ListenAndSelectTextQuestion
   ) => {
     const renderedOptions = current.id === question.id ? shuffledChoiceOptions : current.options
 
     return (
-    <div className="space-y-3">
-      {renderedOptions.map((option) => {
-        const isSelected = draft.choiceIds.includes(option.id)
-        const isCorrectOption = option.isCorrect
+      <div className="space-y-3">
+        {renderedOptions.map((option) => {
+          const isSelected = draft.choiceIds.includes(option.id)
+          const isCorrectOption = option.isCorrect
 
-        let buttonStyle = "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-        if (showFeedback) {
-          if (isCorrectOption) {
-            buttonStyle = "bg-green-500 text-white hover:bg-green-500"
+          let buttonStyle = "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+          if (showFeedback) {
+            if (isCorrectOption) {
+              buttonStyle = "bg-green-500 text-white hover:bg-green-500"
+            } else if (isSelected) {
+              buttonStyle = "bg-red-400 text-white hover:bg-red-400"
+            } else {
+              buttonStyle = "bg-muted text-muted-foreground hover:bg-muted"
+            }
           } else if (isSelected) {
-            buttonStyle = "bg-red-400 text-white hover:bg-red-400"
-          } else {
-            buttonStyle = "bg-muted text-muted-foreground hover:bg-muted"
+            buttonStyle = "bg-primary text-primary-foreground hover:bg-primary"
           }
-        } else if (isSelected) {
-          buttonStyle = "bg-primary text-primary-foreground hover:bg-primary"
-        }
 
         return (
           <Button
@@ -490,22 +760,145 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
             size="lg"
             onClick={() => handleChoiceClick(option.id)}
             disabled={showFeedback}
-            className={cn("min-h-16 w-full whitespace-normal rounded-xl px-4 text-base font-semibold", buttonStyle)}
+            className={cn("min-h-16 w-full whitespace-normal rounded-xl px-4 py-4 text-base font-semibold", buttonStyle)}
           >
-            {option.text}
+            <div className="flex w-full flex-col items-center gap-3 text-center">
+              {option.text && <span>{option.text}</span>}
+            </div>
           </Button>
         )
       })}
-    </div>
+      </div>
+    )
+  }
+
+  const renderImageSelectionQuestion = (current: ImageSelectionQuestion, options?: { mobileTwoByTwo?: boolean }) => {
+    const renderedOptions = current.id === question.id ? shuffledChoiceOptions : current.options
+
+    return (
+      <div className={cn("grid gap-4 sm:grid-cols-2", (options?.mobileTwoByTwo || current.type === "image_selection") && "grid-cols-2")}>
+        {renderedOptions.map((option) => {
+          const isSelected = draft.choiceIds.includes(option.id)
+          const isCorrectOption = option.isCorrect
+
+          let imageStateClass = "border-border/70 hover:border-primary/40"
+          if (showFeedback) {
+            if (isCorrectOption) {
+              imageStateClass = "border-green-500 ring-4 ring-green-200"
+            } else if (isSelected) {
+              imageStateClass = "border-red-400 ring-4 ring-red-200"
+            } else {
+              imageStateClass = "border-border/40 opacity-75"
+            }
+          } else if (isSelected) {
+            imageStateClass = "border-primary ring-4 ring-primary/20"
+          }
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => handleChoiceClick(option.id)}
+              disabled={showFeedback}
+              className="group text-left"
+            >
+              <div className={cn(
+                "mx-auto max-w-[150px] overflow-hidden rounded-3xl border-2 bg-white shadow-sm transition-all sm:max-w-[170px]",
+                (options?.mobileTwoByTwo || current.type === "image_selection") && "max-w-[130px]"
+              , imageStateClass)}>
+                <div className="aspect-[4/3] w-full bg-muted/20">
+                  {option.imageUrl?.trim() ? (
+                    <img
+                      src={option.imageUrl}
+                      alt={option.text || "Image answer option"}
+                      className="h-full w-full object-contain"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-4 text-center text-sm font-medium text-muted-foreground">
+                      Add an image URL for this option
+                    </div>
+                  )}
+                </div>
+              </div>
+              {option.text && (
+                <p className="mt-2 text-center text-sm font-medium text-foreground">{option.text}</p>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderImageMultipleSelectionQuestion = (current: ImageMultipleSelectionQuestion) => {
+    const renderedOptions = current.id === question.id ? shuffledChoiceOptions : current.options
+
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+          {renderedOptions.map((option) => {
+            const isSelected = draft.choiceIds.includes(option.id)
+            const isCorrectOption = option.isCorrect
+
+            let imageStateClass = "border-border/70 hover:border-primary/40"
+            if (showFeedback) {
+              if (isCorrectOption) {
+                imageStateClass = "border-green-500 ring-4 ring-green-200"
+              } else if (isSelected) {
+                imageStateClass = "border-red-400 ring-4 ring-red-200"
+              } else {
+                imageStateClass = "border-border/40 opacity-75"
+              }
+            } else if (isSelected) {
+              imageStateClass = "border-primary ring-4 ring-primary/20"
+            }
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleChoiceClick(option.id)}
+                disabled={showFeedback}
+                className="group text-left"
+              >
+                <div className={cn("mx-auto max-w-[130px] overflow-hidden rounded-3xl border-2 bg-white shadow-sm transition-all sm:max-w-[170px]", imageStateClass)}>
+                  <div className="aspect-[4/3] w-full bg-muted/20">
+                    {option.imageUrl?.trim() ? (
+                      <img
+                        src={option.imageUrl}
+                        alt={option.text || "Image answer option"}
+                        className="h-full w-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-4 text-center text-sm font-medium text-muted-foreground">
+                        Add an image URL for this option
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {option.text && (
+                  <p className="mt-2 text-center text-sm font-medium text-foreground">{option.text}</p>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
     )
   }
 
   const renderFillInBlank = (current: FillInBlankQuestion) => {
     const characters = current.word.split("")
+    const fillInBlankMetrics = getFillInBlankMetrics(characters.length)
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-wrap justify-center gap-2">
+        <div
+          className="flex flex-nowrap justify-center"
+          style={{ gap: `${fillInBlankMetrics.gap}px` }}
+        >
           {characters.map((character, index) => {
             const isHidden = current.hiddenIndexes.includes(index)
             const selectedLetter = draft.fillAnswers[index]
@@ -514,9 +907,18 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
               <div
                 key={`${character}-${index}`}
                 className={cn(
-                  "flex h-14 w-12 items-center justify-center rounded-2xl border text-xl font-black",
-                  isHidden ? "border-dashed border-primary/40 bg-primary/5 text-primary" : "border-border bg-muted text-foreground"
+                  "flex shrink-0 items-center justify-center rounded-2xl border font-black",
+                  showFeedback && isCorrect
+                    ? "border-green-500 bg-green-100 text-green-700"
+                    : isHidden
+                      ? "border-dashed border-primary/40 bg-primary/5 text-primary"
+                      : "border-border bg-muted text-foreground"
                 )}
+                style={{
+                  width: `${fillInBlankMetrics.tileWidth}px`,
+                  height: `${fillInBlankMetrics.tileHeight}px`,
+                  fontSize: `${fillInBlankMetrics.fontSize}px`,
+                }}
               >
                 {isHidden ? selectedLetter || "_" : character}
               </div>
@@ -543,7 +945,11 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                       disabled={showFeedback}
                       className={cn(
                         "h-14 rounded-xl text-xl font-black",
-                        isSelected ? "bg-primary text-primary-foreground hover:bg-primary" : "bg-background hover:bg-muted"
+                        showFeedback && isCorrect
+                          ? "bg-green-500 text-white hover:bg-green-500"
+                          : isSelected
+                            ? "bg-primary text-primary-foreground hover:bg-primary"
+                            : "bg-background hover:bg-muted"
                       )}
                     >
                       {letter}
@@ -574,6 +980,263 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
       {renderChoiceQuestion(current)}
     </div>
   )
+
+  const renderListenAndSelectImage = (current: ListenAndSelectImageQuestion) => (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-primary/5 p-4 text-center">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => speakPrompt(current.audioText)}
+          className="rounded-xl"
+        >
+          <Volume2 className="mr-2 h-4 w-4" />
+          Listen
+        </Button>
+      </div>
+      {renderImageSelectionQuestion(current as ListenAndSelectImageQuestion as ImageSelectionQuestion, { mobileTwoByTwo: true })}
+    </div>
+  )
+
+  const renderTextOrderingQuestion = (current: SingleTextOrderingQuestion | PhraseOrderingQuestion | TextOrderingQuestion) => {
+    const orderedItems = draft.orderingIds
+      .map((itemId) => current.items.find((item) => item.id === itemId))
+      .filter((item): item is TextOrderingQuestion["items"][number] => Boolean(item))
+  const isLetterOrdering = current.type === "single_text_ordering"
+  const isPhraseOrdering = current.type === "phrase_ordering" || current.type === "text_ordering"
+  const availableItems = shuffledOrderingItems.filter((item) => !draft.orderingIds.includes(item.id))
+  const singleTextOrderingMetrics = getSingleTextOrderingMetrics(current.items.length)
+
+    return (
+      <div className="space-y-4">
+        <p className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
+          {isLetterOrdering
+            ? "Tap the letters below to build the correct word. Tap a filled slot to remove it."
+            : isPhraseOrdering
+              ? "Tap one word and then another to swap their positions."
+              : "Press and drag each item to place it in the correct order."}
+        </p>
+        {isLetterOrdering ? (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Word slots
+              </p>
+              <div
+                className="flex flex-nowrap justify-center"
+                style={{ gap: `${singleTextOrderingMetrics.gap}px` }}
+              >
+                {Array.from({ length: current.items.length }).map((_, index) => {
+                  const item = orderedItems[index]
+
+                  return (
+                    <button
+                      key={`letter-slot-${index}`}
+                      type="button"
+                      onClick={() => item && removeSingleTextOrderingItem(index)}
+                      disabled={showFeedback || !item}
+                      className={cn(
+                        "flex shrink-0 items-center justify-center rounded-2xl border border-dashed font-black uppercase shadow-sm transition-colors",
+                        showFeedback && isCorrect
+                          ? "border-green-500 bg-green-100 text-green-700"
+                          : item
+                            ? "border-primary/30 bg-background text-foreground"
+                            : "border-border bg-muted/15 text-muted-foreground/45"
+                      )}
+                      style={{
+                        width: `${singleTextOrderingMetrics.tileSize}px`,
+                        height: `${singleTextOrderingMetrics.tileSize}px`,
+                        fontSize: `${singleTextOrderingMetrics.fontSize}px`,
+                      }}
+                    >
+                      {item ? item.text : `${index + 1}`}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Letter bank
+              </p>
+              <div
+                className="flex flex-nowrap justify-center"
+                style={{ gap: `${singleTextOrderingMetrics.gap}px` }}
+              >
+                {availableItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => addSingleTextOrderingItem(item.id)}
+                    disabled={showFeedback}
+                    className={cn(
+                      "flex shrink-0 items-center justify-center rounded-2xl border font-black uppercase shadow-sm transition-transform hover:scale-[1.02]",
+                      showFeedback && isCorrect
+                        ? "border-green-500 bg-green-500 text-white"
+                        : "border-border bg-background text-foreground"
+                    )}
+                    style={{
+                      width: `${singleTextOrderingMetrics.tileSize}px`,
+                      height: `${singleTextOrderingMetrics.tileSize}px`,
+                      fontSize: `${singleTextOrderingMetrics.fontSize}px`,
+                    }}
+                  >
+                    {item.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : isPhraseOrdering ? (
+          <div className="mx-auto flex w-full max-w-md flex-col gap-3">
+            {orderedItems.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handlePhraseSwapClick(item.id)}
+                disabled={showFeedback}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl border border-border border-b-4 border-b-border/80 bg-background px-4 py-3 text-left shadow-sm transition-colors",
+                  showFeedback && isCorrect && "border-green-500 border-b-green-600 bg-green-100",
+                  selectedPhraseSwapId === item.id && "border-primary bg-primary/10"
+                )}
+              >
+                <div className="flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-bold text-primary">
+                  {index + 1}
+                </div>
+                <div className="flex-1 text-sm font-bold leading-none text-foreground">
+                  {item.text || "Word"}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Reorder.Group
+            axis="x"
+            values={draft.orderingIds}
+            onReorder={(nextOrderingIds) =>
+              !showFeedback &&
+              setDraft((currentDraft) => ({ ...currentDraft, orderingIds: nextOrderingIds }))
+            }
+            className="mx-auto flex w-fit max-w-full gap-3 overflow-x-auto pb-2"
+          >
+            {orderedItems.map((item, index) => (
+              <TextOrderingTile
+                key={item.id}
+                index={index}
+                itemId={item.id}
+                label={item.text}
+                isLetterOrdering={isLetterOrdering}
+                isPhraseOrdering={false}
+                disabled={showFeedback}
+              />
+            ))}
+          </Reorder.Group>
+        )}
+      </div>
+    )
+  }
+
+  const renderImageOrderingQuestion = (current: ImageOrderingQuestion) => {
+    const selectedItems = draft.orderingIds
+      .map((itemId) => current.items.find((item) => item.id === itemId))
+      .filter((item): item is ImageOrderingQuestion["items"][number] => Boolean(item))
+    const availableItems = shuffledOrderingItems.filter(
+      (item) => !draft.orderingIds.includes(item.id)
+    )
+    const totalSlots = current.items.length
+
+    return (
+      <div className="space-y-4">
+        <p className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
+          Tap the images below to place them in the correct order. Tap a filled slot to remove it.
+        </p>
+        <div className="space-y-3">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Order slots
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {Array.from({ length: totalSlots }).map((_, index) => {
+              const item = selectedItems[index]
+
+              return (
+                <button
+                  key={`slot-${index}`}
+                  type="button"
+                  onClick={() => item && removeImageOrderingItem(index)}
+                  disabled={showFeedback || !item}
+                  className={cn(
+                    "mx-auto w-fit overflow-hidden rounded-3xl border border-dashed bg-background shadow-sm transition-colors",
+                    showFeedback && isCorrect
+                      ? "border-green-500 bg-green-50"
+                      : item
+                        ? "border-primary/30"
+                        : "border-border"
+                  )}
+                >
+                  <div className="flex h-7 items-center justify-center bg-muted/30 text-[11px] font-bold text-muted-foreground">
+                    {index + 1}
+                  </div>
+                  <div className="aspect-square w-full max-w-[96px] bg-muted/20 sm:max-w-[110px]">
+                    {item?.imageUrl?.trim() ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.text || `Selected image ${index + 1}`}
+                        className="h-full w-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-3 text-center text-xs font-medium text-muted-foreground">
+                        Tap an image below
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Image bank
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {availableItems.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => addImageOrderingItem(item.id)}
+                disabled={showFeedback}
+                className={cn(
+                  "mx-auto w-fit overflow-hidden rounded-3xl border shadow-sm transition-transform hover:scale-[1.02]",
+                  showFeedback && isCorrect
+                    ? "border-green-500 bg-green-50"
+                    : "border-border bg-background"
+                )}
+              >
+                <div className="aspect-square w-full max-w-[96px] bg-muted/20 sm:max-w-[110px]">
+                  {item.imageUrl?.trim() ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.text || `Ordering option ${index + 1}`}
+                      className="h-full w-full object-contain"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-3 text-center text-xs font-medium text-muted-foreground">
+                      Add an image URL for this item
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const renderMatchItems = (current: MatchItemsQuestion) => {
     const rightOptions = shuffledMatchOptions
@@ -650,10 +1313,11 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
               return (
                 <div
                   key={option}
-                  className={cn(
-                    "mx-auto w-full max-w-[180px] rounded-xl border shadow-sm transition-all sm:max-w-[220px]",
-                    isUsed ? "border-primary/20 bg-primary/5" : "border-border bg-background"
-                  )}
+                    className={cn(
+                      "mx-auto w-full max-w-[180px] rounded-xl border shadow-sm transition-all sm:max-w-[220px]",
+                      showFeedback && isCorrect && "border-green-500 bg-green-50",
+                      isUsed ? "border-primary/20 bg-primary/5" : "border-border bg-background"
+                    )}
                 >
                   <button
                     type="button"
@@ -676,6 +1340,9 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                     disabled={showFeedback}
                     className={cn(
                       "flex min-h-12 w-full touch-none items-center justify-center rounded-xl px-3 py-2 text-center text-sm font-medium transition-all sm:px-4",
+                      showFeedback && isCorrect
+                        ? "bg-green-500 text-white"
+                        : 
                       isUsed
                         ? "bg-primary/10 text-primary"
                         : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -700,6 +1367,9 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
                   data-match-target-id={pair.id}
                   className={cn(
                     "flex min-h-12 w-full items-center justify-center rounded-xl px-3 py-2 text-center text-sm font-medium transition-all sm:px-4",
+                    showFeedback && isCorrect
+                      ? "bg-green-500 text-white"
+                      :
                     activeDropZone === pair.id
                       ? "bg-pink-100 text-pink-700"
                       : "bg-secondary text-secondary-foreground"
@@ -742,16 +1412,36 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
               <p className="mb-2 text-sm font-medium text-muted-foreground">
                 {topic?.name || "Active challenge"}
               </p>
-              <h2 className="text-2xl font-bold text-foreground sm:text-4xl">{question.prompt}</h2>
+              {(question.type === "image_selection" || question.type === "image_multiple_selection") && question.imageUrl?.trim() && (
+                <div className="mx-auto mb-5 aspect-[4/3] w-full max-w-md overflow-hidden rounded-3xl border border-border/60 bg-muted/30 shadow-sm">
+                  <img
+                    src={question.imageUrl}
+                    alt={question.prompt || "Question image"}
+                    className="h-full w-full object-contain"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+              )}
+              {question.type !== "listen_and_select" && (
+                <h2 className="text-2xl font-bold text-foreground sm:text-4xl">{question.prompt}</h2>
+              )}
             </div>
 
             {question.type === "single_choice" && renderChoiceQuestion(question)}
             {question.type === "multiple_choice" && renderChoiceQuestion(question)}
             {question.type === "fill_in_blank" && renderFillInBlank(question)}
             {question.type === "listen_and_select" && renderListenAndSelect(question as ListenAndSelectQuestion)}
+            {question.type === "listen_and_select_text" && renderListenAndSelect(question as ListenAndSelectTextQuestion)}
+            {question.type === "listen_and_select_image" && renderListenAndSelectImage(question as ListenAndSelectImageQuestion)}
+            {question.type === "image_selection" && renderImageSelectionQuestion(question as ImageSelectionQuestion)}
+            {question.type === "image_multiple_selection" && renderImageMultipleSelectionQuestion(question as ImageMultipleSelectionQuestion)}
+            {question.type === "single_text_ordering" && renderTextOrderingQuestion(question as SingleTextOrderingQuestion)}
+            {question.type === "phrase_ordering" && renderTextOrderingQuestion(question as PhraseOrderingQuestion)}
+            {question.type === "text_ordering" && renderTextOrderingQuestion(question as TextOrderingQuestion)}
+            {question.type === "image_ordering" && renderImageOrderingQuestion(question as ImageOrderingQuestion)}
             {question.type === "match_items" && renderMatchItems(question)}
 
-            {(question.type === "multiple_choice" || question.type === "fill_in_blank" || question.type === "match_items") && (
+            {(question.type === "multiple_choice" || question.type === "image_multiple_selection" || question.type === "fill_in_blank" || question.type === "single_text_ordering" || question.type === "phrase_ordering" || question.type === "text_ordering" || question.type === "image_ordering" || question.type === "match_items") && (
               <div className="mt-6 flex justify-center">
                 <Button
                   onClick={commitAnswer}

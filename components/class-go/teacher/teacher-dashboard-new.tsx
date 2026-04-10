@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { BookOpen, Lightbulb, LogOut, Settings, Users } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { toast } from "@/hooks/use-toast"
 import { getAvatarUrl } from "@/lib/avatars"
 import type { ClassroomWithDetails, Plan, PlanWithTopics, StudentResultWithDetails, Topic, User } from "@/lib/types"
 import {
@@ -154,21 +155,47 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
     activationMode: "manual" | "auto"
     startDate: Date | null
   }) => {
-    if (editingPlan) {
-      await updatePlan(editingPlan.id, data)
-    } else {
-      await createPlan(data)
-    }
+    try {
+      if (editingPlan) {
+        await updatePlan(editingPlan.id, data)
+      } else {
+        await createPlan(data)
+      }
 
-    setShowPlanForm(false)
-    setEditingPlan(null)
-    await refreshData()
+      setShowPlanForm(false)
+      setEditingPlan(null)
+      await refreshData()
+      toast({
+        title: editingPlan ? "Plan updated" : "Plan created",
+        description: editingPlan
+          ? "The plan was saved successfully."
+          : "The plan was created successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: editingPlan ? "Plan couldn't be updated" : "Plan couldn't be created",
+        description: error instanceof Error ? error.message : "Could not complete the request.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeletePlan = async (planId: string) => {
     if (!confirm("Are you sure you want to delete this plan?")) return
-    await deletePlan(planId)
-    await refreshData()
+    try {
+      await deletePlan(planId)
+      await refreshData()
+      toast({
+        title: "Plan deleted",
+        description: "The plan was deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Plan couldn't be deleted",
+        description: error instanceof Error ? error.message : "Could not complete the request.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddTopicToPlan = async (planId: string, topicId: string) => {
@@ -208,21 +235,47 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
     difficulty: "easy" | "medium" | "hard"
     questions: Topic["questions"]
   }) => {
-    if (editingTopic) {
-      await updateTopic(editingTopic.id, data)
-    } else {
-      await createTopic(data)
-    }
+    try {
+      if (editingTopic) {
+        await updateTopic(editingTopic.id, data)
+      } else {
+        await createTopic(data)
+      }
 
-    setShowTopicForm(false)
-    setEditingTopic(null)
-    await refreshData()
+      setShowTopicForm(false)
+      setEditingTopic(null)
+      await refreshData()
+      toast({
+        title: editingTopic ? "Topic updated" : "Topic created",
+        description: editingTopic
+          ? "The topic was saved successfully."
+          : "The topic was created successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: editingTopic ? "Topic couldn't be updated" : "Topic couldn't be created",
+        description: error instanceof Error ? error.message : "Could not complete the request.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteTopic = async (topicId: string) => {
     if (!confirm("Are you sure you want to delete this topic?")) return
-    await deleteTopic(topicId)
-    await refreshData()
+    try {
+      await deleteTopic(topicId)
+      await refreshData()
+      toast({
+        title: "Topic deleted",
+        description: "The topic was deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Topic couldn't be deleted",
+        description: error instanceof Error ? error.message : "Could not complete the request.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAvatarChange = async (avatarId: string) => {
