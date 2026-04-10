@@ -103,6 +103,15 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     () => (question.type === "fill_in_blank" ? createFillOptions(question) : {}),
     [question]
   )
+  const shuffledChoiceOptions = useMemo(
+    () =>
+      question.type === "single_choice" ||
+      question.type === "multiple_choice" ||
+      question.type === "listen_and_select"
+        ? shuffleArray(question.options)
+        : [],
+    [question]
+  )
   const shuffledMatchOptions = useMemo(
     () => (question.type === "match_items" ? shuffleArray(question.pairs.map((pair) => pair.right)) : []),
     [question]
@@ -224,7 +233,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = "es-ES"
+    utterance.lang = "en-US"
     utterance.rate = 0.9
     window.speechSynthesis.speak(utterance)
   }
@@ -452,9 +461,12 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
 
   const renderChoiceQuestion = (
     current: MultipleChoiceQuestion | SingleChoiceQuestion | ListenAndSelectQuestion
-  ) => (
+  ) => {
+    const renderedOptions = current.id === question.id ? shuffledChoiceOptions : current.options
+
+    return (
     <div className="space-y-3">
-      {current.options.map((option) => {
+      {renderedOptions.map((option) => {
         const isSelected = draft.choiceIds.includes(option.id)
         const isCorrectOption = option.isCorrect
 
@@ -485,7 +497,8 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         )
       })}
     </div>
-  )
+    )
+  }
 
   const renderFillInBlank = (current: FillInBlankQuestion) => {
     const characters = current.word.split("")
@@ -557,7 +570,6 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           <Volume2 className="mr-2 h-4 w-4" />
           Listen
         </Button>
-        <p className="mt-3 text-sm text-muted-foreground">{current.audioText}</p>
       </div>
       {renderChoiceQuestion(current)}
     </div>

@@ -422,7 +422,8 @@ function normalizeApiErrorMessage(message: string) {
   if (
     normalized === "bad credentials" ||
     normalized === "invalid credentials" ||
-    normalized === "credenciales invalidas"
+    normalized === "credenciales invalidas" ||
+    normalized === "user not found"
   ) {
     return "The email or password is incorrect."
   }
