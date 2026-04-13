@@ -27,6 +27,34 @@ export interface AchievementPayload {
   updatedProgress: AchievementProgressSnapshot
 }
 
+export interface PedagogicalTag {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface PedagogicalTagMetric {
+  slug: string
+  name: string
+  questionCount: number
+  answeredCount: number
+  correctCount: number
+  accuracy: number
+  averageScore: number
+}
+
+export interface ClassroomPedagogicalTagsOverview {
+  classroomId: string
+  classroomName: string
+  metrics: PedagogicalTagMetric[]
+}
+
+export interface StudentPedagogicalTagsOverview {
+  studentId: string
+  studentName: string
+  metrics: PedagogicalTagMetric[]
+}
+
 export interface User {
   id: string
   name: string
@@ -107,6 +135,7 @@ interface TopicQuestionBase {
   prompt: string
   imageUrl?: string
   explanation?: string
+  pedagogicalTags?: string[]
 }
 
 export interface MultipleChoiceQuestion extends TopicQuestionBase {

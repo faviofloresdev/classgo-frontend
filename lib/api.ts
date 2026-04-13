@@ -4,11 +4,14 @@ import type {
   AchievementPayload,
   AvatarId,
   Classroom,
+  ClassroomPedagogicalTagsOverview,
   ClassroomWithDetails,
   LeaderboardEntry,
+  PedagogicalTag,
   Plan,
   PlanTopic,
   PlanWithTopics,
+  StudentPedagogicalTagsOverview,
   StudentResultWithDetails,
   Topic,
   TopicQuestion,
@@ -204,6 +207,34 @@ interface BackendAchievementPayload {
   updatedProgress: BackendAchievementProgress
 }
 
+interface BackendPedagogicalTag {
+  id: string
+  name: string
+  slug: string
+}
+
+interface BackendPedagogicalTagMetric {
+  slug: string
+  name: string
+  questionCount: number
+  answeredCount: number
+  correctCount: number
+  accuracy: number
+  averageScore: number
+}
+
+interface BackendClassroomPedagogicalTagsOverview {
+  classroomId: string
+  classroomName: string
+  metrics: BackendPedagogicalTagMetric[]
+}
+
+interface BackendStudentPedagogicalTagsOverview {
+  studentId: string
+  studentName: string
+  metrics: BackendPedagogicalTagMetric[]
+}
+
 export interface StudentPresenceStreamEvent {
   classroomId: string
   studentId: string
@@ -267,7 +298,36 @@ function toDifficulty(difficulty: BackendDifficulty): Topic["difficulty"] {
 }
 
 function ensureQuestions(questions: unknown): TopicQuestion[] {
-  return Array.isArray(questions) ? (questions as TopicQuestion[]) : []
+  if (!Array.isArray(questions)) {
+    return []
+  }
+
+  return (questions as TopicQuestion[]).map((question) => ({
+    ...question,
+    pedagogicalTags: Array.isArray(question.pedagogicalTags)
+      ? [...new Set(question.pedagogicalTags.map((tag) => String(tag).toLowerCase()))]
+      : [],
+  }))
+}
+
+function mapPedagogicalTag(tag: BackendPedagogicalTag): PedagogicalTag {
+  return {
+    id: tag.id,
+    name: tag.name,
+    slug: tag.slug,
+  }
+}
+
+function mapPedagogicalTagMetric(metric: BackendPedagogicalTagMetric) {
+  return {
+    slug: metric.slug,
+    name: metric.name,
+    questionCount: metric.questionCount,
+    answeredCount: metric.answeredCount,
+    correctCount: metric.correctCount,
+    accuracy: metric.accuracy,
+    averageScore: metric.averageScore,
+  }
 }
 
 function mapBasicUser(user: BackendBasicUser, role: User["role"]): User {
@@ -503,6 +563,18 @@ function normalizeApiErrorMessage(message: string) {
   return message
 }
 
+export class ApiError extends Error {
+  code?: string
+  status?: number
+
+  constructor(message: string, options: { code?: string; status?: number } = {}) {
+    super(message)
+    this.name = "ApiError"
+    this.code = options.code
+    this.status = options.status
+  }
+}
+
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const session = readSession()
   const headers = new Headers(init.headers)
@@ -531,11 +603,16 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
         if (contentType.includes("application/json")) {
           const payload = (await response.json()) as {
             error?: {
+              code?: string
               message?: string
             }
             message?: string
           }
           message = payload.error?.message || payload.message || message
+          throw new ApiError(normalizeApiErrorMessage(message), {
+            code: payload.error?.code,
+            status: response.status,
+          })
         } else {
           const text = await response.text()
           if (text) {
@@ -553,7 +630,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
           message = "You are not allowed to perform this action."
         }
       }
-      throw new Error(normalizeApiErrorMessage(message))
+      throw new ApiError(normalizeApiErrorMessage(message), { status: response.status })
     }
 
     if (response.status === 204) {
@@ -755,6 +832,33 @@ export async function getTeacherClassroomDetail(classroomId: string) {
   }
 }
 
+export async function getClassroomPedagogicalTagsOverview(classroomId: string): Promise<ClassroomPedagogicalTagsOverview> {
+  const response = await apiRequest<BackendClassroomPedagogicalTagsOverview>(
+    `/api/classrooms/${classroomId}/pedagogical-tags/overview`
+  )
+
+  return {
+    classroomId: response.classroomId,
+    classroomName: response.classroomName,
+    metrics: (response.metrics || []).map(mapPedagogicalTagMetric),
+  }
+}
+
+export async function getStudentPedagogicalTags(
+  classroomId: string,
+  studentId: string
+): Promise<StudentPedagogicalTagsOverview> {
+  const response = await apiRequest<BackendStudentPedagogicalTagsOverview>(
+    `/api/classrooms/${classroomId}/students/${studentId}/pedagogical-tags`
+  )
+
+  return {
+    studentId: response.studentId,
+    studentName: response.studentName,
+    metrics: (response.metrics || []).map(mapPedagogicalTagMetric),
+  }
+}
+
 export async function createClassroom(payload: Pick<Classroom, "name" | "code" | "description">) {
   const response = await apiRequest<BackendClassroom>("/api/classrooms", {
     method: "POST",
@@ -859,6 +963,36 @@ export async function activatePlanWeek(planId: string, weekNumber: number) {
 export async function getTeacherTopics() {
   const response = await apiRequest<BackendTopic[]>("/api/topics/teachers/me")
   return response.map(mapTopic)
+}
+
+export async function getPedagogicalTags(query?: string) {
+  const search = query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""
+  const response = await apiRequest<BackendPedagogicalTag[]>(`/api/pedagogical-tags${search}`)
+  return response.map(mapPedagogicalTag)
+}
+
+export async function createPedagogicalTag(name: string) {
+  const response = await apiRequest<BackendPedagogicalTag>("/api/pedagogical-tags", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  })
+
+  return mapPedagogicalTag(response)
+}
+
+export async function updatePedagogicalTag(tagId: string, name: string) {
+  const response = await apiRequest<BackendPedagogicalTag>(`/api/pedagogical-tags/${tagId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  })
+
+  return mapPedagogicalTag(response)
+}
+
+export async function deletePedagogicalTag(tagId: string) {
+  await apiRequest<void>(`/api/pedagogical-tags/${tagId}`, {
+    method: "DELETE",
+  })
 }
 
 export async function createTopic(payload: {

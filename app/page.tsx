@@ -10,7 +10,9 @@ import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
 import { BadgeCeremony } from "@/components/class-go/badge-ceremony"
 import { Spinner } from "@/components/ui/spinner"
+import { toast } from "@/hooks/use-toast"
 import {
+  ApiError,
   NETWORK_ACTIVITY_EVENT,
   getClassroomLeaderboard,
   getCurrentUser,
@@ -47,7 +49,14 @@ export interface GameState {
   totalQuestions: number
   correctAnswers: number
   retryCount?: number
-  answers: { question: string; correct: boolean; selected: string }[]
+  answers: {
+    questionId: string
+    id: string
+    question: string
+    correct: boolean
+    isCorrect: boolean
+    selected: string
+  }[]
   classroomId?: string
   topicId?: string
   topic?: Topic
@@ -296,20 +305,53 @@ export default function ClassGoApp() {
       retryCount: finalState.retryCount || 0,
     })
 
-    const submittedResult = await submitResult({
-      classroomId: finalState.classroomId,
-      topicId: finalState.topicId,
-      weekNumber: finalState.weekNumber,
-      score,
-      timeSpent,
-      correctAnswers: finalState.correctAnswers,
-      totalQuestions: finalState.totalQuestions,
-      answers: finalState.answers,
-    })
+    let submitTopicId = finalState.topicId
+    let submitWeekNumber = finalState.weekNumber
+    let submittedResult: StudentResultWithDetails
+
+    try {
+      const liveContext = await getGameplayContext(finalState.classroomId)
+
+      if (liveContext.topic?.id === finalState.topicId) {
+        submitTopicId = liveContext.topic.id
+        submitWeekNumber = liveContext.currentWeek
+      }
+
+      submittedResult = await submitResult({
+        classroomId: finalState.classroomId,
+        topicId: submitTopicId,
+        weekNumber: submitWeekNumber,
+        score,
+        timeSpent,
+        correctAnswers: finalState.correctAnswers,
+        totalQuestions: finalState.totalQuestions,
+        answers: finalState.answers,
+      })
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.message === "The result does not match the active topic or week"
+      ) {
+        toast({
+          title: "This challenge changed",
+          description:
+            "The active topic or week changed while the student was playing. Please start the challenge again.",
+          variant: "destructive",
+        })
+        setGameState({
+          ...finalState,
+          submittedResult: null,
+        })
+        setScreen("student-dashboard")
+        return
+      }
+
+      throw error
+    }
 
     const leaderboard = await getClassroomLeaderboard(
       finalState.classroomId,
-      finalState.weekNumber
+      submitWeekNumber
     ).catch(() => [])
 
     const activityTypes = new Set<"QUIZ" | "MATCH" | "DRAG_DROP">()

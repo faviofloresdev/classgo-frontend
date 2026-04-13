@@ -111,7 +111,7 @@ export function StudentAchievementsPage({
           </motion.button>
           <div className="flex-1">
             <h1 className="text-xl font-black text-indigo-900">Rewards & Badge Guide</h1>
-            <p className="text-sm text-indigo-600">Tap any badge to view it in full ceremony mode.</p>
+            <p className="text-sm text-indigo-600">Tap any unlocked badge to view it in full ceremony mode.</p>
           </div>
           <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-indigo-900 shadow-sm">
             {unlockedBadges.length}/{badgeProgress.length} unlocked
@@ -120,6 +120,31 @@ export function StudentAchievementsPage({
       </header>
 
       <main className="mx-auto max-w-6xl p-4 pb-24">
+        <div className="mb-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#4f46e5_0%,#7c3aed_48%,#ec4899_100%)] p-5 text-white shadow-xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-3 inline-flex rounded-full bg-white/20 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-yellow-100">
+                Badge Time
+              </div>
+              <h2 className="text-2xl font-black md:text-3xl">
+                Explore your <span className="text-yellow-200">reward collection</span>
+              </h2>
+              <p className="mt-2 max-w-xl text-sm font-semibold text-white/85 md:text-base">
+                Unlock badges as you play, learn, keep your streak, and discover more parts of Class Go.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-start rounded-[1.5rem] bg-white/12 px-4 py-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-xl">
+                ✦
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Keep going</p>
+                <p className="text-sm font-bold text-white">Every challenge can unlock something new.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           {[
             { icon: Trophy, label: "Completed Challenges", value: achievementSummary.completedChallenges, tone: "bg-green-100 text-green-700" },

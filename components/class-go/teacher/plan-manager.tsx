@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence, Reorder } from "framer-motion"
 import {
   ArrowLeft,
@@ -49,6 +49,13 @@ export function PlanManager({
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [expandedPlan, setExpandedPlan] = useState<string | null>(plans[0]?.id || null)
   const [showAddTopic, setShowAddTopic] = useState<string | null>(null)
+  const [localTopicsByPlan, setLocalTopicsByPlan] = useState<Record<string, PlanWithTopics["topics"]>>({})
+
+  useEffect(() => {
+    setLocalTopicsByPlan(
+      Object.fromEntries(plans.map((plan) => [plan.id, plan.topics]))
+    )
+  }, [plans])
 
   const getAvailableTopics = (planId: string) => {
     const plan = plans.find((p) => p.id === planId)
@@ -231,14 +238,32 @@ export function PlanManager({
                       ) : (
                         <Reorder.Group
                           axis="y"
-                          values={plan.topics.map((t) => t.topicId)}
-                          onReorder={(newOrder) => onReorderTopics(plan.id, newOrder)}
+                          values={(localTopicsByPlan[plan.id] || plan.topics).map((t) => t.topicId)}
+                          onReorder={(newOrder) => {
+                            const currentTopics = localTopicsByPlan[plan.id] || plan.topics
+                            const reorderedTopics = newOrder
+                              .map((topicId) => currentTopics.find((topic) => topic.topicId === topicId))
+                              .filter((topic): topic is (typeof currentTopics)[number] => Boolean(topic))
+                              .map((topic, index) => ({
+                                ...topic,
+                                weekNumber: index + 1,
+                              }))
+
+                            setLocalTopicsByPlan((current) => ({
+                              ...current,
+                              [plan.id]: reorderedTopics,
+                            }))
+                          }}
                           className="space-y-2"
                         >
-                          {plan.topics.map((pt) => (
+                          {(localTopicsByPlan[plan.id] || plan.topics).map((pt) => (
                             <Reorder.Item
                               key={pt.topicId}
                               value={pt.topicId}
+                              onDragEnd={() => {
+                                const orderedTopicIds = (localTopicsByPlan[plan.id] || plan.topics).map((topic) => topic.topicId)
+                                onReorderTopics(plan.id, orderedTopicIds)
+                              }}
                               className="flex items-center gap-3 rounded-xl border border-border bg-background p-4"
                             >
                               <GripVertical className="h-5 w-5 cursor-grab text-muted-foreground active:cursor-grabbing" />

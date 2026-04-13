@@ -9,6 +9,7 @@ interface TopicManagerProps {
   topics: Topic[]
   onBack: () => void
   onCreateTopic: () => void
+  onManagePedagogicalTags: () => void
   onEditTopic: (topic: Topic) => void
   onDeleteTopic: (topicId: string) => void
 }
@@ -23,6 +24,7 @@ export function TopicManager({
   topics,
   onBack,
   onCreateTopic,
+  onManagePedagogicalTags,
   onEditTopic,
   onDeleteTopic,
 }: TopicManagerProps) {
@@ -44,18 +46,26 @@ export function TopicManager({
             <p className="text-muted-foreground">Create topics for your plans</p>
           </div>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => {
-            console.log("[v0] Nuevo Topico button clicked")
-            onCreateTopic()
-          }}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-5 w-5" />
-          New Topic
-        </motion.button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onManagePedagogicalTags}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <BookOpen className="h-5 w-5" />
+            Manage Tags
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onCreateTopic}
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-5 w-5" />
+            New Topic
+          </motion.button>
+        </div>
       </div>
 
       {/* Topics Grid */}
