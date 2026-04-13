@@ -2,6 +2,30 @@
 
 export type UserRole = 'teacher' | 'student'
 export type AvatarId = string
+export type AchievementCategory = 'PROGRESS' | 'CONSISTENCY' | 'PERFORMANCE' | 'EXPLORATION' | 'SPECIAL'
+
+export interface AchievementUnlocked {
+  code: string
+  name: string
+  category: AchievementCategory
+  unlockedAt: Date
+}
+
+export interface AchievementProgressSnapshot {
+  completedChallenges: number
+  currentWeeklyStreak: number
+  highScoreChallenges: number
+  perfectChallenges: number
+  distinctSections: number
+  distinctFeatures: number
+  distinctActivityTypes: number
+  firstCompletionCount: number
+}
+
+export interface AchievementPayload {
+  newlyUnlockedAchievements: AchievementUnlocked[]
+  updatedProgress: AchievementProgressSnapshot
+}
 
 export interface User {
   id: string
@@ -11,6 +35,7 @@ export interface User {
   avatarId: AvatarId
   studentAvatarId?: AvatarId | null
   parentAvatarId?: AvatarId | null
+  achievements?: AchievementPayload | null
   createdAt: Date
 }
 
@@ -201,6 +226,7 @@ export interface StudentResult {
   correctAnswers?: number
   totalQuestions?: number
   answers?: unknown
+  achievements?: AchievementPayload | null
 }
 
 export interface WeekHistory {

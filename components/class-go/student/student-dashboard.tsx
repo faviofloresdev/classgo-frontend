@@ -17,11 +17,21 @@ import {
   Sparkles,
   Plus,
   Rocket,
+  ArrowRight,
 } from "lucide-react"
-import type { ClassroomWithDetails, StudentResultWithDetails, Topic, User } from "@/lib/types"
+import type {
+  AchievementPayload,
+  AchievementProgressSnapshot,
+  ClassroomWithDetails,
+  StudentResultWithDetails,
+  Topic,
+  User,
+} from "@/lib/types"
 import { getAvatarUrl } from "@/lib/avatars"
 import { AvatarSelector } from "../avatar-selector"
 import { StudentClassroomView } from "./student-classroom-view"
+import { HexBadgeSVG } from "@/components/class-go/badge-visual"
+import { getBadgeProgress, mergeAchievementPayloads, mergeAchievementProgress } from "@/lib/badges"
 import {
   connectGameplayPresence,
   disconnectGameplayPresence,
@@ -32,11 +42,15 @@ import {
   heartbeatGameplayPresence,
   joinClassroom,
   subscribeToGameplayStream,
+  trackAchievementFeatureUse,
   updateProfile,
 } from "@/lib/api"
 
 interface StudentDashboardProps {
   user: User
+  achievementProgress?: AchievementProgressSnapshot | null
+  onAchievementEvent: (payload: AchievementPayload | null | undefined) => void
+  onOpenRewards: () => void
   onLogout: () => void
   onUserUpdate: (user: User) => void
   onStartChallenge: (classroomId: string, options?: { retryCount?: number; forceRetry?: boolean }) => Promise<void>
@@ -73,6 +87,9 @@ function formatDuration(seconds: number) {
 
 export function StudentDashboard({
   user,
+  achievementProgress,
+  onAchievementEvent,
+  onOpenRewards,
   onLogout,
   onUserUpdate,
   onStartChallenge,
@@ -310,9 +327,24 @@ export function StudentDashboard({
     () => results.reduce((sum, result) => sum + result.score, 0),
     [results]
   )
-  const completedChallenges = results.length
+  const achievementSummary = useMemo(
+    () => mergeAchievementProgress(achievementProgress, results),
+    [achievementProgress, results]
+  )
+  const badgeProgress = useMemo(
+    () =>
+      getBadgeProgress({
+        user,
+        results,
+        progress: achievementSummary,
+        recentAchievements: user.achievements?.newlyUnlockedAchievements,
+      }),
+    [achievementSummary, results, user]
+  )
+  const unlockedBadges = badgeProgress.filter((badge) => badge.unlocked)
+  const completedChallenges = achievementSummary.completedChallenges
   const avgScore = completedChallenges > 0 ? Math.round(totalScore / completedChallenges) : 0
-  const currentStreak = Math.min(completedChallenges, 5)
+  const currentStreak = achievementSummary.currentWeeklyStreak
 
   const handleAvatarChange = async (avatarId: string, name?: string) => {
     const updated = await updateProfile({
@@ -320,6 +352,14 @@ export function StudentDashboard({
       name: name?.trim() ? name.trim() : user.name,
     })
     onUserUpdate(updated)
+    const trimmedName = name?.trim()
+    const featurePayloads = await Promise.all([
+      trackAchievementFeatureUse("UPDATE_AVATAR").catch(() => null),
+      trimmedName && trimmedName !== user.name
+        ? trackAchievementFeatureUse("EDIT_PROFILE").catch(() => null)
+        : Promise.resolve(null),
+    ])
+    onAchievementEvent(mergeAchievementPayloads(updated.achievements, ...featurePayloads))
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
   }
@@ -329,6 +369,8 @@ export function StudentDashboard({
       parentAvatarId: avatarId,
     })
     onUserUpdate(updated)
+    const featurePayload = await trackAchievementFeatureUse("UPDATE_AVATAR").catch(() => null)
+    onAchievementEvent(mergeAchievementPayloads(updated.achievements, featurePayload))
   }
 
   const handleJoinClassroom = async () => {
@@ -337,6 +379,8 @@ export function StudentDashboard({
       await joinClassroom(joinCode.trim().toUpperCase())
       setJoinCode("")
       await loadStudentData()
+      const featurePayload = await trackAchievementFeatureUse("JOIN_CLASSROOM").catch(() => null)
+      onAchievementEvent(featurePayload)
     } catch (error) {
       setJoinError(error instanceof Error ? error.message : "Could not join the classroom.")
     }
@@ -691,6 +735,60 @@ export function StudentDashboard({
               })}
             </div>
           )}
+        </div>
+
+        <div className="mb-8 overflow-hidden rounded-3xl bg-white shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-pink-50 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-xl font-black text-indigo-900">
+                  <Medal className="h-6 w-6 text-amber-500" />
+                  Rewards Summary
+                </h2>
+                <p className="mt-1 text-sm text-indigo-700">
+                  Keep unlocking badges as you complete challenges, maintain streaks, and explore Class Go.
+                </p>
+              </div>
+              <button
+                onClick={onOpenRewards}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-900 shadow-sm transition-colors hover:bg-indigo-50"
+              >
+                Open rewards guide
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Unlocked</p>
+                <p className="mt-2 text-3xl font-black text-slate-900">{unlockedBadges.length}</p>
+                <p className="mt-1 text-sm text-slate-500">out of {badgeProgress.length} total badges</p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Closest Goal</p>
+                <p className="mt-2 text-lg font-black text-slate-900">
+                  {badgeProgress.find((badge) => !badge.unlocked)?.name || "All unlocked"}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {badgeProgress.find((badge) => !badge.unlocked)?.progressLabel || "Amazing work"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Latest Unlocks</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-3 lg:justify-start">
+                  {unlockedBadges.slice(-3).map((badge) => (
+                    <div key={badge.id} className="flex items-center gap-2">
+                      <HexBadgeSVG badge={badge} size={66} />
+                      <span className="text-xs font-bold text-slate-700">{badge.name}</span>
+                    </div>
+                  ))}
+                  {unlockedBadges.length === 0 && (
+                    <span className="text-sm text-slate-500">Your first badges will appear here.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {results.length > 0 && (

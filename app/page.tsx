@@ -5,8 +5,10 @@ import { LandingPage } from "@/components/class-go/landing-page"
 import { LoginScreen } from "@/components/class-go/login-screen"
 import { TeacherDashboardNew } from "@/components/class-go/teacher/teacher-dashboard-new"
 import { StudentDashboard } from "@/components/class-go/student/student-dashboard"
+import { StudentAchievementsPage } from "@/components/class-go/student/student-achievements-page"
 import { GameplayScreen } from "@/components/class-go/gameplay-screen"
 import { ResultsScreen } from "@/components/class-go/results-screen"
+import { BadgeCeremony } from "@/components/class-go/badge-ceremony"
 import { Spinner } from "@/components/ui/spinner"
 import {
   NETWORK_ACTIVITY_EVENT,
@@ -17,16 +19,27 @@ import {
   loginWithEmail,
   loginWithGoogle,
   logout,
+  trackAchievementActivityType,
   submitResult,
 } from "@/lib/api"
-import type { LeaderboardEntry, StudentResultWithDetails, Topic, User } from "@/lib/types"
+import { getCeremonyBadges, mergeAchievementPayloads } from "@/lib/badges"
+import type {
+  AchievementPayload,
+  AchievementProgressSnapshot,
+  LeaderboardEntry,
+  StudentResultWithDetails,
+  Topic,
+  User,
+} from "@/lib/types"
 
 export type Screen =
   | "landing"
   | "login"
   | "teacher-dashboard"
   | "student-dashboard"
+  | "student-achievements"
   | "gameplay"
+  | "badge-ceremony"
   | "results"
 
 export interface GameState {
@@ -86,6 +99,9 @@ export default function ClassGoApp() {
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [pendingRequestCount, setPendingRequestCount] = useState(0)
   const [showNetworkOverlay, setShowNetworkOverlay] = useState(false)
+  const [earnedBadges, setEarnedBadges] = useState<ReturnType<typeof getCeremonyBadges>>([])
+  const [achievementProgress, setAchievementProgress] = useState<AchievementProgressSnapshot | null>(null)
+  const [screenAfterCeremony, setScreenAfterCeremony] = useState<Screen>("student-dashboard")
 
   useEffect(() => {
     const handleNetworkActivity = (event: Event) => {
@@ -111,6 +127,7 @@ export default function ClassGoApp() {
       try {
         const user = await getCurrentUser()
         setCurrentUser(user)
+        setAchievementProgress(user.achievements?.updatedProgress || null)
         setScreen(user.role === "teacher" ? "teacher-dashboard" : "student-dashboard")
       } catch {
         await logout().catch(() => undefined)
@@ -175,17 +192,40 @@ export default function ClassGoApp() {
     await logout().catch(() => undefined)
     setCurrentUser(null)
     setGameState(initialGameState)
+    setEarnedBadges([])
+    setAchievementProgress(null)
     setScreen("landing")
+  }
+
+  const queueAchievementCeremony = (
+    payload: AchievementPayload | null | undefined,
+    resumeScreen: Screen
+  ) => {
+    if (payload?.updatedProgress) {
+      setAchievementProgress(payload.updatedProgress)
+    }
+
+    const ceremonyBadges = getCeremonyBadges(payload?.newlyUnlockedAchievements || [])
+    if (ceremonyBadges.length === 0) {
+      return false
+    }
+
+    setEarnedBadges(ceremonyBadges)
+    setScreenAfterCeremony(resumeScreen)
+    setScreen("badge-ceremony")
+    return true
   }
 
   const handleUserUpdate = (updatedUser: User) => {
     setCurrentUser(updatedUser)
+    setAchievementProgress((currentProgress) => updatedUser.achievements?.updatedProgress || currentProgress)
   }
 
   const handleStartChallenge = async (
     classroomId: string,
     options: { retryCount?: number; forceRetry?: boolean } = {}
   ) => {
+    setEarnedBadges([])
     const retryCount = options.retryCount || 0
     const context = await getGameplayContext(classroomId)
 
@@ -223,7 +263,7 @@ export default function ClassGoApp() {
       topicId: context.topic.id,
       topic: context.topic,
       weekNumber: context.currentWeek,
-      startedAt: Date.now(),
+      startedAt: undefined,
       leaderboard: [],
       submittedResult: null,
     })
@@ -272,15 +312,49 @@ export default function ClassGoApp() {
       finalState.weekNumber
     ).catch(() => [])
 
+    const activityTypes = new Set<"QUIZ" | "MATCH" | "DRAG_DROP">()
+    finalState.topic?.questions.forEach((question) => {
+      if (
+        question.type === "multiple_choice" ||
+        question.type === "single_choice" ||
+        question.type === "fill_in_blank" ||
+        question.type === "listen_and_select" ||
+        question.type === "listen_and_select_text" ||
+        question.type === "listen_and_select_image" ||
+        question.type === "image_selection" ||
+        question.type === "image_multiple_selection"
+      ) {
+        activityTypes.add("QUIZ")
+      } else if (question.type === "match_items") {
+        activityTypes.add("MATCH")
+      } else {
+        activityTypes.add("DRAG_DROP")
+      }
+    })
+
+    const activityPayloads = await Promise.all(
+      [...activityTypes].map((activityType) =>
+        trackAchievementActivityType(activityType).catch(() => null)
+      )
+    )
+    const combinedAchievementPayload = mergeAchievementPayloads(
+      submittedResult.achievements,
+      ...activityPayloads
+    )
+
     setGameState({
       ...finalState,
       leaderboard,
       submittedResult,
     })
-    setScreen("results")
+    const showedCeremony = queueAchievementCeremony(combinedAchievementPayload, "results")
+    if (!showedCeremony) {
+      setScreen("results")
+    }
   }
 
   const handleBackToHome = () => {
+    setEarnedBadges([])
     if (currentUser?.role === "teacher") {
       setScreen("teacher-dashboard")
     } else {
@@ -327,6 +401,13 @@ export default function ClassGoApp() {
       {screen === "student-dashboard" && currentUser && (
         <StudentDashboard
           user={currentUser}
+          achievementProgress={achievementProgress}
+          onAchievementEvent={(payload) => {
+            queueAchievementCeremony(payload, "student-dashboard")
+          }}
+          onOpenRewards={() => {
+            setScreen("student-achievements")
+          }}
           onLogout={() => {
             void handleLogout()
           }}
@@ -335,8 +416,30 @@ export default function ClassGoApp() {
         />
       )}
 
+      {screen === "student-achievements" && currentUser && (
+        <StudentAchievementsPage
+          user={currentUser}
+          achievementProgress={achievementProgress}
+          onAchievementEvent={(payload) => {
+            queueAchievementCeremony(payload, "student-achievements")
+          }}
+          onBack={() => {
+            setScreen("student-dashboard")
+          }}
+        />
+      )}
+
       {screen === "gameplay" && gameState.topic && (
         <GameplayScreen gameState={gameState} onGameComplete={handleGameComplete} />
+      )}
+
+      {screen === "badge-ceremony" && earnedBadges.length > 0 && (
+        <BadgeCeremony
+          badges={earnedBadges}
+          onDone={() => {
+            setScreen(screenAfterCeremony)
+          }}
+        />
       )}
 
       {screen === "results" && (

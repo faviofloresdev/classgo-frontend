@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getAvatarUrl } from "@/lib/avatars"
-import { BookOpen, Heart, LineChart, ShieldCheck, Users } from "lucide-react"
+import { BookOpen, Heart, LineChart, Medal, ShieldCheck, Sparkles, Users } from "lucide-react"
 
 interface LandingPageProps {
   onGetStarted: () => void
@@ -49,6 +49,21 @@ const teacherCards = [
     description:
       "With clearer information, teachers can reinforce a specific skill, revisit a topic, or focus on what each group needs most.",
     tone: "bg-accent/20 text-accent-foreground",
+  },
+]
+
+const rewardCards = [
+  {
+    icon: Medal,
+    title: "Unlock rewards",
+    description: "Students can earn badges as they complete challenges, improve accuracy, and keep showing up.",
+    tone: "bg-amber-100 text-amber-600",
+  },
+  {
+    icon: Sparkles,
+    title: "Celebrate progress",
+    description: "Every new reward appears with a short ceremony that makes progress visible and exciting.",
+    tone: "bg-indigo-100 text-indigo-600",
   },
 ]
 
@@ -337,6 +352,38 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                       </h3>
                       <p className="mt-3 text-base leading-8 text-muted-foreground">
                         {card.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="border-t border-primary/6 bg-[linear-gradient(180deg,rgba(251,191,36,0.06)_0%,rgba(255,255,255,0)_100%)] px-6 py-14 md:px-10 lg:px-14">
+            <div className="mx-auto max-w-5xl">
+              <h2 className="text-center text-3xl font-black tracking-tight text-foreground">
+                Rewards that keep students motivated
+              </h2>
+              <p className="mt-3 text-center text-base leading-7 text-muted-foreground">
+                Class Go now includes badges and unlockable rewards that turn progress into something students can see and celebrate.
+              </p>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
+                {rewardCards.map((reward) => (
+                  <Card
+                    key={reward.title}
+                    className="h-full rounded-[2rem] border border-primary/8 bg-white/92 shadow-[0_14px_35px_rgba(15,23,42,0.06)]"
+                  >
+                    <CardContent className="p-6">
+                      <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${reward.tone}`}>
+                        <reward.icon className="size-5" />
+                      </div>
+                      <h3 className="text-[1.55rem] font-black leading-tight text-foreground">
+                        {reward.title}
+                      </h3>
+                      <p className="mt-3 text-base leading-8 text-muted-foreground">
+                        {reward.description}
                       </p>
                     </CardContent>
                   </Card>
