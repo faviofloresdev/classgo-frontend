@@ -6,6 +6,7 @@ import { BookOpen, Lightbulb, LogOut, Settings, Users } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "@/hooks/use-toast"
 import { getAvatarUrl } from "@/lib/avatars"
+import { ApiError } from "@/lib/api"
 import type { ClassroomWithDetails, Plan, PlanWithTopics, StudentResultWithDetails, Topic, User } from "@/lib/types"
 import {
   activatePlanWeek,
@@ -32,12 +33,13 @@ import { AvatarSelector } from "../avatar-selector"
 import { ClassroomDetail } from "./classroom-detail"
 import { ClassroomForm } from "./classroom-form"
 import { ClassroomManager } from "./classroom-manager"
+import { PedagogicalTagManager } from "./pedagogical-tag-manager"
 import { PlanForm } from "./plan-form"
 import { PlanManager } from "./plan-manager"
 import { TopicForm } from "./topic-form"
 import { TopicManager } from "./topic-manager"
 
-type TabId = "classrooms" | "plans" | "topics"
+type TabId = "classrooms" | "plans" | "topics" | "tags"
 
 interface TeacherDashboardNewProps {
   user: User
@@ -211,8 +213,34 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
   }
 
   const handleReorderTopics = async (planId: string, orderedTopicIds: string[]) => {
-    await reorderPlanTopics(planId, orderedTopicIds)
-    await refreshData()
+    try {
+      const currentPlan = plans.find((plan) => plan.id === planId)
+      const activeTopicId = currentPlan?.topics.find((topic) => topic.isActive)?.topicId ?? null
+      const reorderedPlan = await reorderPlanTopics(planId, orderedTopicIds)
+
+      if (activeTopicId) {
+        const activeTopicInNewOrder = reorderedPlan.topics.find((topic) => topic.topicId === activeTopicId)
+
+        if (activeTopicInNewOrder) {
+          await activatePlanWeek(planId, activeTopicInNewOrder.weekNumber)
+
+          await Promise.all(
+            classrooms
+              .filter((classroom) => classroom.activePlanId === planId)
+              .map((classroom) => updateClassroom(classroom.id, { currentWeek: activeTopicInNewOrder.weekNumber }))
+          )
+        }
+      }
+
+      await refreshData()
+    } catch (error) {
+      toast({
+        title: "Plan order couldn't be updated",
+        description: error instanceof Error ? error.message : "Could not reorder the plan topics.",
+        variant: "destructive",
+      })
+      await refreshData()
+    }
   }
 
   const handleActivateWeek = async (planId: string, weekNumber: number) => {
@@ -252,9 +280,18 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
           : "The topic was created successfully.",
       })
     } catch (error) {
+      const description =
+        error instanceof ApiError && error.code === "PEDAGOGICAL_TAGS_INVALID"
+          ? "The question contains invalid pedagogical tags."
+          : error instanceof ApiError && error.code === "PEDAGOGICAL_TAG_NOT_FOUND"
+            ? "One or more selected pedagogical tags no longer exist."
+            : error instanceof Error
+              ? error.message
+              : "Could not complete the request."
+
       toast({
         title: editingTopic ? "Topic couldn't be updated" : "Topic couldn't be created",
-        description: error instanceof Error ? error.message : "Could not complete the request.",
+        description,
         variant: "destructive",
       })
     }
@@ -288,6 +325,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
       { id: "classrooms" as const, label: "Classrooms", icon: Users },
       { id: "plans" as const, label: "Plans", icon: BookOpen },
       { id: "topics" as const, label: "Topics", icon: Lightbulb },
+      { id: "tags" as const, label: "Tags", icon: BookOpen },
     ],
     []
   )
@@ -338,7 +376,7 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
 
         {!viewingClassroom && !showTopicForm && (
           <div className="mb-4 rounded-3xl border border-border bg-card p-4 shadow-sm lg:p-5">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -364,6 +402,11 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
         {showTopicForm ? (
           <TopicForm
             topic={editingTopic}
+            onManagePedagogicalTags={() => {
+              setShowTopicForm(false)
+              setEditingTopic(editingTopic)
+              setActiveTab("tags")
+            }}
             onSave={(data) => {
               void handleSaveTopic(data)
             }}
@@ -465,6 +508,9 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
                   setEditingTopic(null)
                   setShowTopicForm(true)
                 }}
+                onManagePedagogicalTags={() => {
+                  setActiveTab("tags")
+                }}
                 onEditTopic={(topic) => {
                   setEditingTopic(topic)
                   setShowTopicForm(true)
@@ -472,6 +518,12 @@ export function TeacherDashboardNew({ user, onLogout, onUserUpdate }: TeacherDas
                 onDeleteTopic={(topicId) => {
                   void handleDeleteTopic(topicId)
                 }}
+              />
+            )}
+
+            {activeTab === "tags" && (
+              <PedagogicalTagManager
+                onBack={() => setActiveTab("topics")}
               />
             )}
           </>

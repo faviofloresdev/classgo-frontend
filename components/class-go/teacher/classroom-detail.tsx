@@ -13,8 +13,16 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Target,
 } from "lucide-react"
-import type { ClassroomWithDetails, StudentResultWithDetails, User } from "@/lib/types"
+import { getClassroomPedagogicalTagsOverview, getStudentPedagogicalTags } from "@/lib/api"
+import type {
+  ClassroomPedagogicalTagsOverview,
+  ClassroomWithDetails,
+  PedagogicalTagMetric,
+  StudentPedagogicalTagsOverview,
+  StudentResultWithDetails,
+} from "@/lib/types"
 import { getAvatarUrl } from "@/lib/avatars"
 
 interface ClassroomDetailProps {
@@ -34,10 +42,86 @@ export function ClassroomDetail({
 }: ClassroomDetailProps) {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState<number>(classroom.currentWeek || 1)
+  const [overviewSort, setOverviewSort] = useState<"worst" | "best" | "usage">("worst")
+  const [pedagogicalOverview, setPedagogicalOverview] = useState<ClassroomPedagogicalTagsOverview | null>(null)
+  const [studentTagOverview, setStudentTagOverview] = useState<StudentPedagogicalTagsOverview | null>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [isOverviewLoading, setIsOverviewLoading] = useState(true)
+  const [isStudentOverviewLoading, setIsStudentOverviewLoading] = useState(false)
+  const [overviewError, setOverviewError] = useState<string | null>(null)
+  const [studentOverviewError, setStudentOverviewError] = useState<string | null>(null)
 
   useEffect(() => {
     setSelectedWeek(classroom.currentWeek || 1)
   }, [classroom.currentWeek])
+
+  useEffect(() => {
+    let isCancelled = false
+    setIsOverviewLoading(true)
+    setOverviewError(null)
+
+    void getClassroomPedagogicalTagsOverview(classroom.id)
+      .then((overview) => {
+        if (!isCancelled) {
+          setPedagogicalOverview(overview)
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setPedagogicalOverview(null)
+          setOverviewError("We couldn't load the pedagogical tags overview for this classroom.")
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsOverviewLoading(false)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [classroom.id])
+
+  useEffect(() => {
+    if (!selectedStudentId) {
+      setStudentTagOverview(null)
+      setStudentOverviewError(null)
+      return
+    }
+
+    let isCancelled = false
+    setIsStudentOverviewLoading(true)
+    setStudentOverviewError(null)
+
+    void getStudentPedagogicalTags(classroom.id, selectedStudentId)
+      .then((overview) => {
+        if (!isCancelled) {
+          setStudentTagOverview(overview)
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setStudentTagOverview(null)
+          setStudentOverviewError("We couldn't load this student's pedagogical tag details.")
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsStudentOverviewLoading(false)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [classroom.id, selectedStudentId])
+
+  const getStudentTagStatus = (metric: PedagogicalTagMetric) => {
+    if (metric.accuracy >= 0.85) return { label: "Strong", className: "bg-green-100 text-green-700" }
+    if (metric.accuracy >= 0.6) return { label: "Developing", className: "bg-yellow-100 text-yellow-700" }
+    return { label: "Needs support", className: "bg-red-100 text-red-700" }
+  }
 
   // Group results by week
   const resultsByWeek = results.reduce(
@@ -67,6 +151,11 @@ export function ClassroomDetail({
     currentWeekResults.length > 0
       ? Math.round(currentWeekResults.reduce((sum, r) => sum + r.score, 0) / currentWeekResults.length)
       : 0
+  const sortedOverviewMetrics = [...(pedagogicalOverview?.metrics || [])].sort((a, b) => {
+    if (overviewSort === "best") return b.accuracy - a.accuracy
+    if (overviewSort === "usage") return b.answeredCount - a.answeredCount
+    return a.accuracy - b.accuracy
+  })
 
   return (
     <div className="space-y-6">
@@ -186,12 +275,17 @@ export function ClassroomDetail({
             {classroom.students.map((student, index) => {
               const result = currentWeekResults.find((r) => r.studentId === student.id)
               return (
-                <motion.div
+                <motion.button
                   key={student.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center gap-4 rounded-xl border border-border bg-background p-4"
+                  onClick={() => {
+                    setSelectedStudentId((current) => (current === student.id ? null : student.id))
+                  }}
+                  className={`flex w-full items-center gap-4 rounded-xl border bg-background p-4 text-left ${
+                    selectedStudentId === student.id ? "border-primary bg-primary/5" : "border-border"
+                  }`}
                 >
                   <img
                     src={getAvatarUrl(student.studentAvatarId || student.avatarId)}
@@ -228,7 +322,7 @@ export function ClassroomDetail({
                       Pending
                     </span>
                   )}
-                </motion.div>
+                </motion.button>
               )
             })}
           </div>
@@ -237,6 +331,154 @@ export function ClassroomDetail({
             There are no students in this classroom
           </p>
         )}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Pedagogical Tags Overview</h3>
+              <p className="text-sm text-muted-foreground">See where the class is strongest and where students need more support.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "worst", label: "Worst accuracy" },
+                { id: "best", label: "Best accuracy" },
+                { id: "usage", label: "Most used" },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setOverviewSort(option.id as "worst" | "best" | "usage")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    overviewSort === option.id
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border bg-background text-muted-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {isOverviewLoading ? (
+              <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                Loading pedagogical analytics...
+              </p>
+            ) : overviewError ? (
+              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-10 text-center text-sm text-destructive">
+                {overviewError}
+              </p>
+            ) : sortedOverviewMetrics.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                No pedagogical tag data is available yet for this classroom.
+              </p>
+            ) : (
+              sortedOverviewMetrics.map((metric) => (
+                <div key={metric.slug} className="rounded-2xl border border-border bg-background p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-foreground">{metric.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-foreground">{Math.round(metric.accuracy * 100)}%</p>
+                      <p className="text-xs text-muted-foreground">accuracy</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Questions</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{metric.questionCount}</p>
+                    </div>
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Answers</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{metric.answeredCount}</p>
+                    </div>
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Correct</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{metric.correctCount}</p>
+                    </div>
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Avg score</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{metric.averageScore}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Target className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Student Tag Detail</h3>
+              <p className="text-sm text-muted-foreground">
+                {selectedStudentId
+                  ? "Strengths and areas of support by tag."
+                  : "Choose a student above to see their pedagogical tags."}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {!selectedStudentId ? (
+              <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                Select a student card to open their pedagogical tag analytics.
+              </p>
+            ) : isStudentOverviewLoading ? (
+              <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                Loading student analytics...
+              </p>
+            ) : studentOverviewError ? (
+              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-10 text-center text-sm text-destructive">
+                {studentOverviewError}
+              </p>
+            ) : !studentTagOverview || studentTagOverview.metrics.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                No pedagogical tag data is available yet for this student.
+              </p>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-muted/20 p-4">
+                  <p className="text-sm text-muted-foreground">Student</p>
+                  <p className="text-lg font-bold text-foreground">{studentTagOverview.studentName}</p>
+                </div>
+                {studentTagOverview.metrics.map((metric) => {
+                  const status = getStudentTagStatus(metric)
+
+                  return (
+                    <div key={metric.slug} className="rounded-2xl border border-border bg-background p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-foreground">{metric.name}</p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-2xl font-bold text-foreground">{Math.round(metric.accuracy * 100)}%</p>
+                          <p className="text-xs text-muted-foreground">accuracy</p>
+                        </div>
+                        <div className="text-right text-sm text-muted-foreground">
+                          <p>{metric.correctCount}/{metric.answeredCount} correct</p>
+                          <p>Average score {metric.averageScore}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Week History (Archived) */}

@@ -511,7 +511,17 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     setLocalGameState((prev) => ({
       ...prev,
       correctAnswers: correct ? prev.correctAnswers + 1 : prev.correctAnswers,
-      answers: [...prev.answers, { question: question.prompt, correct, selected: selectedSummary }],
+      answers: [
+        ...prev.answers,
+        {
+          questionId: question.id,
+          id: question.id,
+          question: question.prompt,
+          correct,
+          isCorrect: correct,
+          selected: selectedSummary,
+        },
+      ],
     }))
   }
 
@@ -540,7 +550,17 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           setLocalGameState((prev) => ({
             ...prev,
             correctAnswers: correct ? prev.correctAnswers + 1 : prev.correctAnswers,
-            answers: [...prev.answers, { question: question.prompt, correct, selected: selectedOption.text || "Image option" }],
+            answers: [
+              ...prev.answers,
+              {
+                questionId: question.id,
+                id: question.id,
+                question: question.prompt,
+                correct,
+                isCorrect: correct,
+                selected: selectedOption.text || "Image option",
+              },
+            ],
           }))
         }
       }, 0)

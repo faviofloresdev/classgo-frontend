@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react"
+import { getPedagogicalTags } from "@/lib/api"
 import type {
   FillInBlankQuestion,
   ImageOrderingQuestion,
   MatchItemsQuestion,
+  PedagogicalTag,
   PhraseOrderingQuestion,
   SingleTextOrderingQuestion,
   Topic,
@@ -29,6 +31,7 @@ interface TopicFormProps {
     questions: TopicQuestion[]
   }) => void
   onClose: () => void
+  onManagePedagogicalTags?: () => void
 }
 
 const colorOptions = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#84CC16"]
@@ -71,6 +74,8 @@ const orderingItem = (): TopicOrderingItem => ({ id: createId(), text: "", image
 const hasImageUrl = (value?: string) => Boolean(value?.trim())
 const getQuestionTypeLabel = (type: TopicQuestionType) =>
   questionTypes.find((item) => item.value === type)?.label ?? (type === "text_ordering" ? "Phrase ordering" : type)
+const normalizePedagogicalTags = (tags?: string[]) =>
+  Array.isArray(tags) ? [...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))] : []
 const orderingLinesToItems = (value: string, previousItems: TopicOrderingItem[] = []): TopicOrderingItem[] =>
   value
     .split(/\r?\n/)
@@ -101,7 +106,7 @@ const phraseToItems = (value: string, previousItems: TopicOrderingItem[] = []): 
     }))
 
 function createQuestion(type: TopicQuestionType): TopicQuestion {
-  const base = { id: createId(), type, prompt: "", imageUrl: "", explanation: "" }
+  const base = { id: createId(), type, prompt: "", imageUrl: "", explanation: "", pedagogicalTags: [] as string[] }
   if (type === "fill_in_blank") return { ...base, type, word: "", hiddenIndexes: [] }
   if (type === "match_items") return { ...base, type, instruction: "", pairs: [pair(), pair()] }
   if (type === "listen_and_select") return { ...base, type, audioText: "", options: [choice("", true), choice(), choice()] }
@@ -116,20 +121,72 @@ function createQuestion(type: TopicQuestionType): TopicQuestion {
   return { ...base, type, options: [choice("", true), choice(), choice()] }
 }
 
-export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
+export function TopicForm({ topic, onSave, onClose, onManagePedagogicalTags }: TopicFormProps) {
   const [name, setName] = useState(topic?.name || "")
   const [description, setDescription] = useState(topic?.description || "")
   const [color, setColor] = useState(topic?.color || "#10B981")
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(topic?.difficulty || "easy")
-  const [questions, setQuestions] = useState<TopicQuestion[]>(topic?.questions?.length ? topic.questions : [createQuestion("single_choice")])
+  const [questions, setQuestions] = useState<TopicQuestion[]>(
+    topic?.questions?.length
+      ? topic.questions.map((question) => ({
+          ...question,
+          pedagogicalTags: normalizePedagogicalTags(question.pedagogicalTags),
+        }))
+      : [createQuestion("single_choice")]
+  )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [typePickerQuestionId, setTypePickerQuestionId] = useState<string | null>(null)
   const [addQuestionSearch, setAddQuestionSearch] = useState("")
   const [typePickerSearch, setTypePickerSearch] = useState<Record<string, string>>({})
   const [phraseOrderingInput, setPhraseOrderingInput] = useState<Record<string, string>>({})
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(() => topic?.questions?.[0]?.id ?? null)
+  const [availableTags, setAvailableTags] = useState<PedagogicalTag[]>([])
+  const [tagSearchByQuestion, setTagSearchByQuestion] = useState<Record<string, string>>({})
+  const [tagSuggestionsByQuestion, setTagSuggestionsByQuestion] = useState<Record<string, PedagogicalTag[]>>({})
+  const [tagLoadingByQuestion, setTagLoadingByQuestion] = useState<Record<string, boolean>>({})
 
   const updateQuestion = (id: string, updater: (q: TopicQuestion) => TopicQuestion) =>
     setQuestions((current) => current.map((q) => (q.id === id ? updater(q) : q)))
+
+  const addQuestionOfType = (type: TopicQuestionType) => {
+    const nextQuestion = createQuestion(type)
+    setQuestions((current) => [...current, nextQuestion])
+    setExpandedQuestionId(nextQuestion.id)
+  }
+
+  const getTagLabel = (slug: string) =>
+    availableTags.find((tag) => tag.slug === slug)?.name ||
+    Object.values(tagSuggestionsByQuestion)
+      .flat()
+      .find((tag) => tag.slug === slug)?.name ||
+    slug.replace(/_/g, " ")
+
+  const updatePedagogicalTags = (id: string, nextTags: string[]) =>
+    updateQuestion(id, (question) => ({
+      ...question,
+      pedagogicalTags: normalizePedagogicalTags(nextTags),
+    }))
+
+  const addPedagogicalTagToQuestion = (questionId: string, tag: PedagogicalTag) => {
+    const question = questions.find((item) => item.id === questionId)
+    const currentTags = normalizePedagogicalTags(question?.pedagogicalTags)
+    if (currentTags.includes(tag.slug)) {
+      setTagSearchByQuestion((current) => ({ ...current, [questionId]: "" }))
+      return
+    }
+
+    updatePedagogicalTags(questionId, [...currentTags, tag.slug])
+    setTagSearchByQuestion((current) => ({ ...current, [questionId]: "" }))
+    setTagSuggestionsByQuestion((current) => ({ ...current, [questionId]: [] }))
+  }
+
+  const removePedagogicalTagFromQuestion = (questionId: string, slug: string) => {
+    const question = questions.find((item) => item.id === questionId)
+    updatePedagogicalTags(
+      questionId,
+      normalizePedagogicalTags(question?.pedagogicalTags).filter((tag) => tag !== slug)
+    )
+  }
 
   const updateFillQuestion = (id: string, updater: (q: FillInBlankQuestion) => FillInBlankQuestion) =>
     updateQuestion(id, (q) => (q.type === "fill_in_blank" ? updater(q) : q))
@@ -154,6 +211,63 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
       if (q.type !== "single_choice" && q.type !== "multiple_choice" && q.type !== "listen_and_select" && q.type !== "listen_and_select_text" && q.type !== "listen_and_select_image" && q.type !== "image_selection" && q.type !== "image_multiple_selection") return q
       return { ...q, options: updater(q.options, q.type) }
     })
+
+  useEffect(() => {
+    let isCancelled = false
+
+    void getPedagogicalTags()
+      .then((tags) => {
+        if (!isCancelled) {
+          setAvailableTags(tags)
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!questions.length) {
+      setExpandedQuestionId(null)
+      return
+    }
+
+    if (!expandedQuestionId || !questions.some((question) => question.id === expandedQuestionId)) {
+      setExpandedQuestionId(questions[0].id)
+    }
+  }, [expandedQuestionId, questions])
+
+  useEffect(() => {
+    const activeQuestionEntries = Object.entries(tagSearchByQuestion)
+      .map(([questionId, search]) => ({ questionId, search: search.trim() }))
+      .filter((entry) => entry.search.length > 0)
+
+    if (activeQuestionEntries.length === 0) {
+      return
+    }
+
+    const timers = activeQuestionEntries.map(({ questionId, search }) =>
+      window.setTimeout(() => {
+        setTagLoadingByQuestion((current) => ({ ...current, [questionId]: true }))
+        void getPedagogicalTags(search)
+          .then((tags) => {
+            setTagSuggestionsByQuestion((current) => ({ ...current, [questionId]: tags }))
+          })
+          .catch(() => {
+            setTagSuggestionsByQuestion((current) => ({ ...current, [questionId]: [] }))
+          })
+          .finally(() => {
+            setTagLoadingByQuestion((current) => ({ ...current, [questionId]: false }))
+          })
+      }, 250)
+    )
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [tagSearchByQuestion])
 
   const validate = () => {
     const next: Record<string, string> = {}
@@ -212,7 +326,17 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
-    onSave({ name, description, icon: "Zap", color, difficulty, questions })
+    onSave({
+      name,
+      description,
+      icon: "Zap",
+      color,
+      difficulty,
+      questions: questions.map((question) => ({
+        ...question,
+        pedagogicalTags: normalizePedagogicalTags(question.pedagogicalTags),
+      })),
+    })
   }
 
   const getFilteredGroups = (search: string) => {
@@ -280,9 +404,18 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Questions</h3>
-                <p className="text-sm text-muted-foreground">Add questions and answers inside this topic.</p>
+                <p className="text-sm text-muted-foreground">Add questions, tags and answers inside this topic.</p>
               </div>
               <div className="space-y-3">
+                {onManagePedagogicalTags && (
+                  <button
+                    type="button"
+                    onClick={onManagePedagogicalTags}
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Manage pedagogical tags
+                  </button>
+                )}
                 <input
                   value={addQuestionSearch}
                   onChange={(e) => setAddQuestionSearch(e.target.value)}
@@ -300,7 +433,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                         <button
                           key={type.value}
                           type="button"
-                          onClick={() => setQuestions((current) => [...current, createQuestion(type.value)])}
+                          onClick={() => addQuestionOfType(type.value)}
                           className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-left text-sm hover:bg-muted"
                         >
                           <span>{type.label}</span>
@@ -319,23 +452,62 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
             {errors.questions && <p className="text-sm text-destructive">{errors.questions}</p>}
 
             <div className="space-y-4">
-              {questions.map((q, index) => (
-                <div key={q.id} className="rounded-2xl border border-border p-4">
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Question {index + 1}</p>
-                      <p className="text-xs text-muted-foreground">{getQuestionTypeLabel(q.type)}</p>
-                    </div>
+              {questions.map((q, index) => {
+                const isExpanded = expandedQuestionId === q.id
+                const tagCount = normalizePedagogicalTags(q.pedagogicalTags).length
+
+                return (
+                  <div key={q.id} className={`rounded-2xl border border-border transition-colors ${isExpanded ? "p-4" : "p-3"}`}>
+                  <div className={`flex gap-3 ${isExpanded ? "flex-col sm:flex-row sm:items-start sm:justify-between" : "items-center justify-between"}`}>
                     <button
                       type="button"
-                      onClick={() => setQuestions((current) => (current.length > 1 ? current.filter((item) => item.id !== q.id) : current))}
+                      onClick={() => setExpandedQuestionId((current) => (current === q.id ? null : q.id))}
+                      className={`flex-1 rounded-2xl bg-muted/25 text-left transition-colors hover:bg-muted/40 ${
+                        isExpanded ? "p-3" : "px-3 py-2.5"
+                      }`}
+                    >
+                      <div className={`flex justify-between gap-3 ${isExpanded ? "items-start" : "items-center"}`}>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Question {index + 1}</p>
+                          <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${isExpanded ? "mt-1" : "mt-0.5"}`}>
+                            <p className="text-xs text-muted-foreground">{getQuestionTypeLabel(q.type)}</p>
+                            <span className="text-xs text-muted-foreground">{tagCount} tags</span>
+                          </div>
+                          <p className={`text-foreground/80 ${isExpanded ? "mt-1 text-sm" : "mt-1 line-clamp-1 text-xs"}`}>
+                            {q.prompt.trim() || "Add the prompt for this question."}
+                          </p>
+                          {isExpanded && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {tagCount > 0
+                                ? normalizePedagogicalTags(q.pedagogicalTags)
+                                    .slice(0, 3)
+                                    .map(getTagLabel)
+                                    .join(", ")
+                                : "No tags selected"}
+                            </p>
+                          )}
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQuestions((current) => (current.length > 1 ? current.filter((item) => item.id !== q.id) : current))
+                      }
                       className="shrink-0 rounded-xl border border-destructive/20 px-3 py-2 text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-3">
+                  {expandedQuestionId === q.id && (
+                  <div className="space-y-4">
+                  <div className="mb-4 mt-4 rounded-2xl border border-border bg-muted/20 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-foreground">Question type</label>
@@ -405,6 +577,68 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-foreground">Prompt</label>
                       <input value={q.prompt} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, prompt: e.target.value }))} className="w-full rounded-xl border border-border bg-background px-4 py-3" />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-sm font-medium text-foreground">Pedagogical tags</label>
+                        <span className="text-xs text-muted-foreground">
+                          {normalizePedagogicalTags(q.pedagogicalTags).length} selected
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {normalizePedagogicalTags(q.pedagogicalTags).map((slug) => (
+                          <span
+                            key={slug}
+                            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground"
+                          >
+                            {getTagLabel(slug)}
+                            <button
+                              type="button"
+                              onClick={() => removePedagogicalTagFromQuestion(q.id, slug)}
+                              className="text-muted-foreground hover:text-foreground"
+                              aria-label={`Remove ${getTagLabel(slug)}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="relative">
+                        <input
+                          value={tagSearchByQuestion[q.id] || ""}
+                          onChange={(e) =>
+                            setTagSearchByQuestion((current) => ({ ...current, [q.id]: e.target.value }))
+                          }
+                          placeholder="Search pedagogical tags"
+                          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm"
+                        />
+                        {(tagSearchByQuestion[q.id] || "").trim().length > 0 && (
+                          <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-card p-2 shadow-lg">
+                            {tagLoadingByQuestion[q.id] ? (
+                              <p className="px-3 py-2 text-sm text-muted-foreground">Searching tags...</p>
+                            ) : tagSuggestionsByQuestion[q.id]?.length ? (
+                              <div className="space-y-1">
+                                {tagSuggestionsByQuestion[q.id]
+                                  .filter((tag) => !normalizePedagogicalTags(q.pedagogicalTags).includes(tag.slug))
+                                  .map((tag) => (
+                                    <button
+                                      key={tag.id}
+                                      type="button"
+                                      onClick={() => addPedagogicalTagToQuestion(q.id, tag)}
+                                      className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                                    >
+                                      <span>{tag.name}</span>
+                                    </button>
+                                  ))}
+                              </div>
+                            ) : (
+                              <p className="px-3 py-2 text-sm text-muted-foreground">
+                                No tags found. Use Manage pedagogical tags to create more.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {(q.type === "image_selection" || q.type === "image_multiple_selection") && (
                       <div>
@@ -740,8 +974,11 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                     <textarea value={q.explanation || ""} onChange={(e) => updateQuestion(q.id, (current) => ({ ...current, explanation: e.target.value }))} rows={2} placeholder="Optional explanation" className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3" />
                     {errors[`question-${q.id}`] && <p className="text-sm text-destructive">{errors[`question-${q.id}`]}</p>}
                   </div>
+                  </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
 
               <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -751,7 +988,7 @@ export function TopicForm({ topic, onSave, onClose }: TopicFormProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setQuestions((current) => [...current, createQuestion("single_choice")])}
+                    onClick={() => addQuestionOfType("single_choice")}
                     className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
                   >
                     <Plus className="mr-2 h-4 w-4" />
