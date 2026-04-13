@@ -206,6 +206,8 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   const topic = gameState.topic
   const questions = topic?.questions?.length ? topic.questions : fallbackQuestions
 
+  const [countdownValue, setCountdownValue] = useState<3 | 2 | 1 | "go">(3)
+  const [showCountdown, setShowCountdown] = useState(true)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [draft, setDraft] = useState<AnswerDraft>(emptyDraft)
   const [showFeedback, setShowFeedback] = useState(false)
@@ -255,6 +257,39 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
         : [],
     [question]
   )
+
+  useEffect(() => {
+    setShowCountdown(true)
+    setCountdownValue(3)
+    setLocalGameState((prev) => ({
+      ...prev,
+      startedAt: undefined,
+    }))
+
+    const countdownTimers = [3, 2, 1].map((value, index) =>
+      window.setTimeout(() => {
+        setCountdownValue(value as 3 | 2 | 1)
+      }, index * 900)
+    )
+
+    const goTimer = window.setTimeout(() => {
+      setCountdownValue("go")
+    }, 2700)
+
+    const finishTimer = window.setTimeout(() => {
+      setShowCountdown(false)
+      setLocalGameState((prev) => ({
+        ...prev,
+        startedAt: Date.now(),
+      }))
+    }, 3600)
+
+    return () => {
+      countdownTimers.forEach((timer) => window.clearTimeout(timer))
+      window.clearTimeout(goTimer)
+      window.clearTimeout(finishTimer)
+    }
+  }, [])
 
   const playFeedbackSound = (correct: boolean) => {
     if (typeof window === "undefined") return
@@ -771,7 +806,10 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     )
   }
 
-  const renderImageSelectionQuestion = (current: ImageSelectionQuestion, options?: { mobileTwoByTwo?: boolean }) => {
+  const renderImageSelectionQuestion = (
+    current: ImageSelectionQuestion | ListenAndSelectImageQuestion,
+    options?: { mobileTwoByTwo?: boolean }
+  ) => {
     const renderedOptions = current.id === question.id ? shuffledChoiceOptions : current.options
 
     return (
@@ -963,7 +1001,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
     )
   }
 
-  const renderListenAndSelect = (current: ListenAndSelectQuestion) => (
+  const renderListenAndSelect = (current: ListenAndSelectQuestion | ListenAndSelectTextQuestion) => (
     <div className="space-y-4">
       <div className="rounded-2xl bg-primary/5 p-4 text-center">
         <Button
@@ -993,7 +1031,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
           Listen
         </Button>
       </div>
-      {renderImageSelectionQuestion(current as ListenAndSelectImageQuestion as ImageSelectionQuestion, { mobileTwoByTwo: true })}
+      {renderImageSelectionQuestion(current, { mobileTwoByTwo: true })}
     </div>
   )
 
@@ -1385,7 +1423,53 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   }
 
   return (
-    <div className="flex min-h-screen flex-col px-4 py-6">
+    <div className="relative flex min-h-screen flex-col px-4 py-6">
+      {showCountdown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[linear-gradient(180deg,rgba(22,24,83,.95)_0%,rgba(58,21,122,.94)_100%)] backdrop-blur-md">
+          <style>{`
+            @keyframes countdown-bounce {
+              0% { transform: scale(.72) rotate(-8deg); opacity: 0; }
+              55% { transform: scale(1.08) rotate(4deg); opacity: 1; }
+              100% { transform: scale(1) rotate(0); opacity: 1; }
+            }
+            @keyframes float-cloud {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-10px); }
+            }
+          `}</style>
+          <div className="absolute left-[-5rem] top-[-4rem] h-64 w-64 rounded-full bg-fuchsia-400/25 blur-3xl" />
+          <div className="absolute bottom-[-6rem] right-[-4rem] h-72 w-72 rounded-full bg-cyan-300/25 blur-3xl" />
+          <div className="absolute left-6 top-24 hidden h-20 w-28 rounded-full bg-white/10 blur-sm sm:block" style={{ animation: "float-cloud 3.8s ease-in-out infinite" }} />
+          <div className="absolute right-8 top-36 hidden h-16 w-24 rounded-full bg-white/10 blur-sm sm:block" style={{ animation: "float-cloud 4.4s ease-in-out infinite" }} />
+          <div className="relative flex max-w-md flex-col items-center px-6 text-center text-white">
+            <p className="mb-3 text-lg font-black tracking-tight text-yellow-200 sm:text-2xl">
+              Are you ready?
+            </p>
+            <p className="mb-5 text-sm font-semibold text-white/75 sm:text-base">
+              Your challenge is about to begin!
+            </p>
+            <div className="flex h-44 w-44 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-[0_24px_90px_rgba(34,211,238,0.3)]">
+              <div
+                className="flex h-32 w-32 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fbbf24_0%,#f472b6_52%,#60a5fa_100%)] shadow-[0_12px_40px_rgba(251,191,36,.35)]"
+                style={{ animation: "countdown-bounce .45s ease both" }}
+              >
+                <span className="text-5xl font-black tracking-tight text-white sm:text-6xl">
+                  {countdownValue === "go" ? "Go!" : countdownValue}
+                </span>
+              </div>
+            </div>
+            <p className="mt-6 max-w-sm text-lg font-black tracking-tight text-white sm:text-2xl">
+              {countdownValue === "go" ? "Let's go!" : "Get set for some fun!"}
+            </p>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-white/75 sm:text-base">
+              {countdownValue === "go"
+                ? "Show what you know and earn new rewards."
+                : "Count down with us and get ready to shine."}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">

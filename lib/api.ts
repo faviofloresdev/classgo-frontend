@@ -1,6 +1,7 @@
 "use client"
 
 import type {
+  AchievementPayload,
   AvatarId,
   Classroom,
   ClassroomWithDetails,
@@ -31,6 +32,7 @@ interface AuthUserResponse {
   avatarId?: AvatarId | null
   studentAvatarId?: AvatarId | null
   parentAvatarId?: AvatarId | null
+  achievements?: BackendAchievementPayload | null
 }
 
 interface LearningAuthResponse {
@@ -136,6 +138,7 @@ interface BackendStudentResult {
   correctAnswers?: number
   totalQuestions?: number
   answers?: unknown
+  achievements?: BackendAchievementPayload | null
   student?: BackendBasicUser
   topic?: {
     id: string
@@ -176,6 +179,29 @@ interface BackendGameplayContext {
   } | null
   attemptAllowed: boolean
   existingResult?: BackendStudentResult | null
+}
+
+interface BackendAchievementUnlocked {
+  code: string
+  name: string
+  category: "PROGRESS" | "CONSISTENCY" | "PERFORMANCE" | "EXPLORATION" | "SPECIAL"
+  unlockedAt: string
+}
+
+interface BackendAchievementProgress {
+  completedChallenges: number
+  currentWeeklyStreak: number
+  highScoreChallenges: number
+  perfectChallenges: number
+  distinctSections: number
+  distinctFeatures: number
+  distinctActivityTypes: number
+  firstCompletionCount: number
+}
+
+interface BackendAchievementPayload {
+  newlyUnlockedAchievements: BackendAchievementUnlocked[]
+  updatedProgress: BackendAchievementProgress
 }
 
 export interface StudentPresenceStreamEvent {
@@ -254,7 +280,33 @@ function mapBasicUser(user: BackendBasicUser, role: User["role"]): User {
     avatarId: studentAvatarId,
     studentAvatarId,
     parentAvatarId: user.parentAvatarId ?? null,
+    achievements: null,
     createdAt: new Date(),
+  }
+}
+
+function mapAchievementPayload(payload?: BackendAchievementPayload | null): AchievementPayload | null {
+  if (!payload) {
+    return null
+  }
+
+  return {
+    newlyUnlockedAchievements: (payload.newlyUnlockedAchievements || []).map((achievement) => ({
+      code: achievement.code,
+      name: achievement.name,
+      category: achievement.category,
+      unlockedAt: new Date(achievement.unlockedAt),
+    })),
+    updatedProgress: {
+      completedChallenges: payload.updatedProgress?.completedChallenges ?? 0,
+      currentWeeklyStreak: payload.updatedProgress?.currentWeeklyStreak ?? 0,
+      highScoreChallenges: payload.updatedProgress?.highScoreChallenges ?? 0,
+      perfectChallenges: payload.updatedProgress?.perfectChallenges ?? 0,
+      distinctSections: payload.updatedProgress?.distinctSections ?? 0,
+      distinctFeatures: payload.updatedProgress?.distinctFeatures ?? 0,
+      distinctActivityTypes: payload.updatedProgress?.distinctActivityTypes ?? 0,
+      firstCompletionCount: payload.updatedProgress?.firstCompletionCount ?? 0,
+    },
   }
 }
 
@@ -268,6 +320,7 @@ function mapUser(user: AuthUserResponse): User {
     avatarId: studentAvatarId,
     studentAvatarId,
     parentAvatarId: user.parentAvatarId ?? null,
+    achievements: mapAchievementPayload(user.achievements),
     createdAt: new Date(),
   }
 }
@@ -279,6 +332,7 @@ function mapCoreAuthUser(user: CoreAuthUserResponse): User {
     email: user.email || "",
     role: toRole(user.role),
     avatarId: "animal-1",
+    achievements: null,
     createdAt: new Date(),
   }
 }
@@ -367,6 +421,7 @@ function mapStudentResult(result: BackendStudentResult): StudentResultWithDetail
     correctAnswers: result.correctAnswers,
     totalQuestions: result.totalQuestions,
     answers: result.answers,
+    achievements: mapAchievementPayload(result.achievements),
     student: result.student ? mapBasicUser(result.student, "student") : undefined,
     topic: result.topic
       ? {
@@ -396,6 +451,15 @@ function readSession(): SessionData | null {
       ...parsed,
       user: {
         ...parsed.user,
+        achievements: parsed.user.achievements
+          ? {
+              ...parsed.user.achievements,
+              newlyUnlockedAchievements: parsed.user.achievements.newlyUnlockedAchievements.map((achievement) => ({
+                ...achievement,
+                unlockedAt: new Date(achievement.unlockedAt),
+              })),
+            }
+          : null,
         createdAt: new Date(parsed.user.createdAt),
       },
     }
@@ -639,6 +703,33 @@ export async function updateProfile(payload: {
   }
 
   return updatedUser
+}
+
+export async function trackAchievementSectionVisit(section: "HOME" | "PROFILE" | "CLASSROOMS" | "ACHIEVEMENTS" | "REWARDS") {
+  const response = await apiRequest<BackendAchievementPayload>("/api/achievements/section-visits", {
+    method: "POST",
+    body: JSON.stringify({ section }),
+  })
+
+  return mapAchievementPayload(response)
+}
+
+export async function trackAchievementFeatureUse(feature: "UPDATE_AVATAR" | "EDIT_PROFILE" | "JOIN_CLASSROOM" | "OPEN_ACHIEVEMENTS" | "VIEW_PROGRESS") {
+  const response = await apiRequest<BackendAchievementPayload>("/api/achievements/feature-uses", {
+    method: "POST",
+    body: JSON.stringify({ feature }),
+  })
+
+  return mapAchievementPayload(response)
+}
+
+export async function trackAchievementActivityType(activityType: "QUIZ" | "MEMORY" | "MATCH" | "DRAG_DROP") {
+  const response = await apiRequest<BackendAchievementPayload>("/api/achievements/activity-types", {
+    method: "POST",
+    body: JSON.stringify({ activityType }),
+  })
+
+  return mapAchievementPayload(response)
 }
 
 export async function getTeacherClassrooms() {

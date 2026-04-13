@@ -20,6 +20,10 @@ const GOOGLE_SCRIPT_ID = "google-identity-services"
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ""
 const HAS_VALID_GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID.endsWith(".apps.googleusercontent.com")
 
+function disconnectResizeObserver(observer: ResizeObserver | null) {
+  observer?.disconnect()
+}
+
 export function LoginScreen({
   onTeacherLogin,
   onStudentLogin,
@@ -152,7 +156,7 @@ export function LoginScreen({
         if (resizeFrameId !== null) {
           window.cancelAnimationFrame(resizeFrameId)
         }
-        resizeObserver?.disconnect()
+        disconnectResizeObserver(resizeObserver)
       }
     }
 
@@ -166,7 +170,7 @@ export function LoginScreen({
         if (resizeFrameId !== null) {
           window.cancelAnimationFrame(resizeFrameId)
         }
-        resizeObserver?.disconnect()
+        disconnectResizeObserver(resizeObserver)
         existingScript.removeEventListener("load", renderGoogleButton)
         existingScript.removeEventListener("error", handleGoogleError)
       }
@@ -186,7 +190,7 @@ export function LoginScreen({
       if (resizeFrameId !== null) {
         window.cancelAnimationFrame(resizeFrameId)
       }
-      resizeObserver?.disconnect()
+      disconnectResizeObserver(resizeObserver)
       script.removeEventListener("load", renderGoogleButton)
       script.removeEventListener("error", handleGoogleError)
     }
