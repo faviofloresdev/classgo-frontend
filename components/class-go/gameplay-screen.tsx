@@ -226,6 +226,11 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
 
   const question = questions[currentQuestion]
   const progress = ((currentQuestion + 1) / questions.length) * 100
+  const countdownHeadline = countdownValue === "go" ? "Let's go!" : "Are you ready?"
+  const countdownSubcopy =
+    countdownValue === "go"
+      ? "Jump in and have fun!"
+      : "Count with us... your challenge starts in"
   const fillOptions = useMemo(
     () => (question.type === "fill_in_blank" ? createFillOptions(question) : {}),
     [question]
@@ -1425,7 +1430,7 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
   return (
     <div className="relative flex min-h-screen flex-col px-4 py-6">
       {showCountdown && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[linear-gradient(180deg,rgba(22,24,83,.95)_0%,rgba(58,21,122,.94)_100%)] backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#4f46e5_0%,#7c3aed_48%,#ec4899_100%)] backdrop-blur-md">
           <style>{`
             @keyframes countdown-bounce {
               0% { transform: scale(.72) rotate(-8deg); opacity: 0; }
@@ -1436,35 +1441,44 @@ export function GameplayScreen({ gameState, onGameComplete }: GameplayScreenProp
               0%, 100% { transform: translateY(0); }
               50% { transform: translateY(-10px); }
             }
+            @keyframes twinkle-star {
+              0%, 100% { transform: scale(.9) rotate(0deg); opacity: .55; }
+              50% { transform: scale(1.15) rotate(12deg); opacity: 1; }
+            }
           `}</style>
-          <div className="absolute left-[-5rem] top-[-4rem] h-64 w-64 rounded-full bg-fuchsia-400/25 blur-3xl" />
+          <div className="absolute left-[-5rem] top-[-4rem] h-64 w-64 rounded-full bg-yellow-300/25 blur-3xl" />
           <div className="absolute bottom-[-6rem] right-[-4rem] h-72 w-72 rounded-full bg-cyan-300/25 blur-3xl" />
-          <div className="absolute left-6 top-24 hidden h-20 w-28 rounded-full bg-white/10 blur-sm sm:block" style={{ animation: "float-cloud 3.8s ease-in-out infinite" }} />
-          <div className="absolute right-8 top-36 hidden h-16 w-24 rounded-full bg-white/10 blur-sm sm:block" style={{ animation: "float-cloud 4.4s ease-in-out infinite" }} />
-          <div className="relative flex max-w-md flex-col items-center px-6 text-center text-white">
-            <p className="mb-3 text-lg font-black tracking-tight text-yellow-200 sm:text-2xl">
-              Are you ready?
+          <div className="absolute left-8 top-20 text-white/80" style={{ animation: "twinkle-star 1.8s ease-in-out infinite" }}>★</div>
+          <div className="absolute right-10 top-28 text-yellow-200/90" style={{ animation: "twinkle-star 2.1s ease-in-out infinite" }}>★</div>
+          <div className="absolute left-6 top-24 hidden h-20 w-28 rounded-full bg-white/12 blur-sm sm:block" style={{ animation: "float-cloud 3.8s ease-in-out infinite" }} />
+          <div className="absolute right-8 top-36 hidden h-16 w-24 rounded-full bg-white/12 blur-sm sm:block" style={{ animation: "float-cloud 4.4s ease-in-out infinite" }} />
+          <div className="relative mx-4 flex w-full max-w-md flex-col items-center rounded-[2rem] border-4 border-white/20 bg-white/12 px-6 py-8 text-center text-white shadow-[0_24px_90px_rgba(49,46,129,0.35)]">
+            <div className="mb-3 rounded-full bg-white/20 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-yellow-100">
+              Challenge Time
+            </div>
+            <p className="mb-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              {countdownHeadline}
             </p>
-            <p className="mb-5 text-sm font-semibold text-white/75 sm:text-base">
-              Your challenge is about to begin!
+            <p className="mb-6 text-sm font-semibold text-white/85 sm:text-base">
+              {countdownSubcopy}
             </p>
-            <div className="flex h-44 w-44 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-[0_24px_90px_rgba(34,211,238,0.3)]">
+            <div className="flex h-48 w-48 items-center justify-center rounded-full border-4 border-white/25 bg-white/10 shadow-[0_24px_90px_rgba(34,211,238,0.3)]">
               <div
-                className="flex h-32 w-32 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fbbf24_0%,#f472b6_52%,#60a5fa_100%)] shadow-[0_12px_40px_rgba(251,191,36,.35)]"
+                className="flex h-36 w-36 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fbbf24_0%,#fb7185_45%,#60a5fa_100%)] shadow-[0_12px_40px_rgba(251,191,36,.35)]"
                 style={{ animation: "countdown-bounce .45s ease both" }}
               >
-                <span className="text-5xl font-black tracking-tight text-white sm:text-6xl">
-                  {countdownValue === "go" ? "Go!" : countdownValue}
+                <span className="text-5xl font-black tracking-tight text-white sm:text-7xl">
+                  {countdownValue === "go" ? "GO!" : countdownValue}
                 </span>
               </div>
             </div>
-            <p className="mt-6 max-w-sm text-lg font-black tracking-tight text-white sm:text-2xl">
-              {countdownValue === "go" ? "Let's go!" : "Get set for some fun!"}
+            <p className="mt-6 max-w-sm text-lg font-black tracking-tight text-yellow-100 sm:text-2xl">
+              {countdownValue === "go" ? "Let's go!" : "3... 2... 1..."}
             </p>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-white/75 sm:text-base">
+            <p className="mt-2 max-w-sm text-sm leading-6 text-white/85 sm:text-base">
               {countdownValue === "go"
-                ? "Show what you know and earn new rewards."
-                : "Count down with us and get ready to shine."}
+                ? "Show what you know and earn new rewards!"
+                : "Get ready to play, learn, and win badges."}
             </p>
           </div>
         </div>

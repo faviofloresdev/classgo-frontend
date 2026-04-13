@@ -545,11 +545,33 @@ export function StudentDashboard({
       </header>
 
       <main className="mx-auto max-w-6xl p-4 pb-24">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <h1 className="text-2xl font-black text-indigo-900 md:text-3xl">
-            Hi, <span className="text-pink-500">{user.name.split(" ")[0]}</span>!
-          </h1>
-          <p className="text-indigo-600">Ready for today's challenge?</p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#4f46e5_0%,#7c3aed_48%,#ec4899_100%)] p-5 text-white shadow-xl"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-3 inline-flex rounded-full bg-white/20 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-yellow-100">
+                Are you ready?
+              </div>
+              <h1 className="text-2xl font-black md:text-3xl">
+                Hi, <span className="text-yellow-200">{user.name.split(" ")[0]}</span>!
+              </h1>
+              <p className="mt-2 max-w-xl text-sm font-semibold text-white/85 md:text-base">
+                Pick your classroom, start your challenge, and win new badges today.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-start rounded-[1.5rem] bg-white/12 px-4 py-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-xl">
+                ★
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Let&apos;s go!</p>
+                <p className="text-sm font-bold text-white">Your next challenge is waiting.</p>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -778,7 +800,7 @@ export function StudentDashboard({
                 <div className="mt-3 flex flex-wrap justify-center gap-3 lg:justify-start">
                   {unlockedBadges.slice(-3).map((badge) => (
                     <div key={badge.id} className="flex items-center gap-2">
-                      <HexBadgeSVG badge={badge} size={66} />
+                      <HexBadgeSVG badge={badge} size={66} compact />
                       <span className="text-xs font-bold text-slate-700">{badge.name}</span>
                     </div>
                   ))}

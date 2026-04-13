@@ -17,6 +17,7 @@ interface HexBadgeSVGProps {
   rotAngle?: number
   glowOpacity?: number
   locked?: boolean
+  compact?: boolean
 }
 
 export function HexBadgeSVG({
@@ -25,6 +26,7 @@ export function HexBadgeSVG({
   rotAngle = 0,
   glowOpacity = 0.38,
   locked = false,
+  compact = false,
 }: HexBadgeSVGProps) {
   const c = badge.c
   const R = 90
@@ -53,7 +55,11 @@ export function HexBadgeSVG({
       viewBox={`0 0 ${W} ${W}`}
       style={{
         overflow: "visible",
-        filter: `${locked ? grayscale : ""} drop-shadow(0 18px 44px ${c.gw}cc) drop-shadow(0 6px 18px rgba(0,0,0,.6))`,
+        filter: `${locked ? grayscale : ""} ${
+          compact
+            ? `drop-shadow(0 8px 16px ${c.gw}66) drop-shadow(0 3px 8px rgba(0,0,0,.35))`
+            : `drop-shadow(0 18px 44px ${c.gw}cc) drop-shadow(0 6px 18px rgba(0,0,0,.6))`
+        }`,
       }}
     >
       <defs>
